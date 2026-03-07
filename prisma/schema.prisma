@@ -1,0 +1,209 @@
+// This is your Prisma schema file,
+// learn more about it in the docs: https://pris.ly/d/prisma-schema
+
+generator client {
+  provider = "prisma-client-js"
+}
+
+datasource db {
+  provider = "postgresql"
+}
+
+enum UserRole {
+  APPLICANT
+  OFFICER
+  ADMIN
+}
+
+enum ApplicationStatus {
+  SUBMITTED
+  UNDER_REVIEW
+  APPROVED
+  REJECTED
+  REQUIRES_CORRECTION
+}
+
+enum DocumentStatus {
+  PENDING
+  APPROVED
+  REJECTED
+}
+
+model PermitType {
+  id           String             @id @default(cuid())
+  code         String             @unique
+  name         String
+  description  String?            @db.Text
+  createdAt    DateTime           @default(now())
+  updatedAt    DateTime           @updatedAt
+
+  requirements PermitRequirement[]
+  applications PermitApplication[]
+}
+
+model PermitRequirement {
+  id           String    @id @default(cuid())
+  key          String
+  label        String
+  description  String?   @db.Text
+  required     Boolean   @default(true)
+  sortOrder    Int       @default(0)
+  acceptMime   String?
+  acceptExt    String?
+  createdAt    DateTime  @default(now())
+  updatedAt    DateTime  @updatedAt
+
+  permitTypeId String
+  permitType   PermitType @relation(fields: [permitTypeId], references: [id], onDelete: Cascade)
+
+  documents    Document[]
+
+  @@unique([permitTypeId, key])
+}
+
+model User {
+  id            String    @id @default(cuid())
+  name          String?
+  email         String    @unique
+  emailVerified DateTime?
+  image         String?
+  password      String?
+  role          UserRole  @default(APPLICANT)
+  phone         String?
+  organization  String?
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  accounts     Account[]
+  sessions     Session[]
+  applications PermitApplication[] @relation("ApplicantApplications")
+  reviews      PermitApplication[] @relation("OfficerReviews")
+  comments     Comment[]
+  notifications Notification[]
+}
+
+model Account {
+  id                String  @id @default(cuid())
+  userId            String
+  type              String
+  provider          String
+  providerAccountId String
+  refresh_token     String? @db.Text
+  access_token      String? @db.Text
+  expires_at        Int?
+  token_type        String?
+  scope             String?
+  id_token          String? @db.Text
+  session_state     String?
+
+  user User @relation(fields: [userId], references: [id], onDelete: Cascade)
+
+  @@unique([provider, providerAccountId])
+}
+
+model Session {
+  id           String   @id @default(cuid())
+  sessionToken String   @unique
+  userId       String
+  expires      DateTime
+  user         User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+}
+
+model VerificationToken {
+  identifier String
+  token      String   @unique
+  expires    DateTime
+
+  @@unique([identifier, token])
+}
+
+model PermitApplication {
+  id          String            @id @default(cuid())
+  permitType  String
+  permitTypeId String?
+  permitTypeRef PermitType? @relation(fields: [permitTypeId], references: [id])
+  description String            @db.Text
+  location    String
+  latitude    Float?
+  longitude   Float?
+  status      ApplicationStatus @default(SUBMITTED)
+  
+  applicantId String
+  applicant   User   @relation("ApplicantApplications", fields: [applicantId], references: [id])
+  
+  officerId   String?
+  officer     User?  @relation("OfficerReviews", fields: [officerId], references: [id])
+  
+  createdAt   DateTime @default(now())
+  updatedAt   DateTime @updatedAt
+  reviewedAt  DateTime?
+  approvedAt  DateTime?
+
+  documents   Document[]
+  comments    Comment[]
+  certificate Certificate?
+  timeline    TimelineEvent[]
+}
+
+model Document {
+  id            String         @id @default(cuid())
+  name          String
+  fileUrl       String
+  fileType      String
+  fileSize      Int
+  status        DocumentStatus @default(PENDING)
+  reviewNotes   String?
+
+  requirementId String?
+  requirement   PermitRequirement? @relation(fields: [requirementId], references: [id])
+
+  applicationId String
+  application   PermitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime          @default(now())
+  updatedAt     DateTime          @updatedAt
+}
+
+model Comment {
+  id            String   @id @default(cuid())
+  content       String   @db.Text
+  isInternal    Boolean  @default(false)
+  applicationId String
+  application   PermitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  authorId      String
+  author        User     @relation(fields: [authorId], references: [id])
+  createdAt     DateTime @default(now())
+}
+
+model Certificate {
+  id            String   @id @default(cuid())
+  certificateNo String   @unique
+  qrCode        String   @db.Text
+  issueDate     DateTime @default(now())
+  expiryDate    DateTime
+  applicationId String   @unique
+  application   PermitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  downloadCount Int      @default(0)
+  createdAt     DateTime @default(now())
+}
+
+model TimelineEvent {
+  id            String            @id @default(cuid())
+  event         String
+  description   String?
+  status        ApplicationStatus
+  applicationId String
+  application   PermitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime          @default(now())
+}
+
+model Notification {
+  id        String   @id @default(cuid())
+  userId    String
+  user      User     @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title     String
+  message   String   @db.Text
+  type      String
+  read      Boolean  @default(false)
+  link      String?
+  createdAt DateTime @default(now())
+}

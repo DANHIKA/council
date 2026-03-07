@@ -1,4 +1,26 @@
-This is a [Next.js](https://nextjs.org) project bootstrapped with [`create-next-app`](https://nextjs.org/docs/app/api-reference/cli/create-next-app).
+# Council Permit Portal
+
+An online platform for applying and managing council permits.
+
+## Features
+
+### For Applicants
+- **Permit Applications**: Easily apply for various council permits through a guided process.
+- **Document Management**: Upload and manage required documentation for your applications.
+- **Real-time Notifications**: Stay updated with instant alerts when your application status changes or when an officer leaves a comment.
+- **Interactive Map**: View all permit applications geographically on a map.
+- **Dashboard**: Track the status of all your current and past applications in one place.
+- **Certificate Download**: Once approved, download your official permit certificates directly from the portal.
+
+### For Council Officers
+- **Review Queue**: Efficiently manage and review incoming permit applications.
+- **Decision Workflow**: Approve, reject, or request corrections on applications with internal and public notes.
+- **Communication**: Communicate directly with applicants through comments.
+- **Officer Assignment**: Claim applications to manage your workload effectively.
+
+### For Administrators
+- **User Management**: Manage system users and their roles (Applicant, Officer, Admin).
+- **Permit Configuration**: (Future) Configure permit types and their specific requirements.
 
 ## Getting Started
 
@@ -6,31 +28,6 @@ First, run the development server:
 
 ```bash
 npm run dev
-# or
-yarn dev
-# or
-pnpm dev
-# or
-bun dev
 ```
 
 Open [http://localhost:3000](http://localhost:3000) with your browser to see the result.
-
-You can start editing the page by modifying `app/page.tsx`. The page auto-updates as you edit the file.
-
-This project uses [`next/font`](https://nextjs.org/docs/app/building-your-application/optimizing/fonts) to automatically optimize and load [Geist](https://vercel.com/font), a new font family for Vercel.
-
-## Learn More
-
-To learn more about Next.js, take a look at the following resources:
-
-- [Next.js Documentation](https://nextjs.org/docs) - learn about Next.js features and API.
-- [Learn Next.js](https://nextjs.org/learn) - an interactive Next.js tutorial.
-
-You can check out [the Next.js GitHub repository](https://github.com/vercel/next.js) - your feedback and contributions are welcome!
-
-## Deploy on Vercel
-
-The easiest way to deploy your Next.js app is to use the [Vercel Platform](https://vercel.com/new?utm_medium=default-template&filter=next.js&utm_source=create-next-app&utm_campaign=create-next-app-readme) from the creators of Next.js.
-
-Check out our [Next.js deployment documentation](https://nextjs.org/docs/app/building-your-application/deploying) for more details.
