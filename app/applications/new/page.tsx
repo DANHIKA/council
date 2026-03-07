@@ -13,10 +13,10 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FileUpload, UploadedFile } from "@/components/ui/file-upload";
+import { FileUpload, UploadedFile } from "@/components/file-upload";
 import { GoogleIframeInput } from "@/components/google-iframe-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, CheckCircle2, AlertCircle, Upload, X, FileText } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, Upload, X, FileText, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { applicationsApi, permitTypesApi } from "@/lib/services";
 import type { PermitType, UploadedDocument } from "@/lib/types";
@@ -51,6 +51,10 @@ export default function NewApplicationPage() {
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
+    // AI Recommendation states
+    const [isRecommending, setIsRecommending] = useState(false);
+    const [aiRecommendation, setAiRecommendation] = useState<{ recommendation: string; explanation: string } | null>(null);
+
     const {
         register,
         handleSubmit,
@@ -63,6 +67,38 @@ export default function NewApplicationPage() {
     });
 
     const watchedPermitTypeId = watch("permitTypeId") || "";
+    const watchedDescription = watch("description") || "";
+
+    const getAIRecommendation = async () => {
+        if (watchedDescription.length < 10) {
+            toast.error("Please provide at least 10 characters for a recommendation.");
+            return;
+        }
+
+        setIsRecommending(true);
+        setAiRecommendation(null);
+        try {
+            const res = await fetch("/api/ai/recommend-permit", {
+                method: "POST",
+                body: JSON.stringify({ description: watchedDescription }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setAiRecommendation(data);
+            
+            // Auto-select if a direct match is found
+            const match = permitTypes.find(pt => pt.name.toLowerCase() === data.recommendation.toLowerCase());
+            if (match) {
+                setValue("permitTypeId", match.id);
+                toast.success(`AI recommended: ${match.name}`);
+            }
+        } catch (err: any) {
+            console.error("AI Recommendation failed:", err);
+            toast.error("AI Recommendation failed. Please select manually.");
+        } finally {
+            setIsRecommending(false);
+        }
+    };
 
     useEffect(() => {
         if (status === "loading") return;
@@ -235,12 +271,38 @@ export default function NewApplicationPage() {
                         </div>
 
                         <div>
-                            <Label htmlFor="description">Description *</Label>
+                            <div className="flex items-center justify-between mb-2">
+                                <Label htmlFor="description">Description *</Label>
+                                <Button 
+                                    type="button" 
+                                    variant="outline" 
+                                    size="sm" 
+                                    onClick={getAIRecommendation}
+                                    disabled={isRecommending || watchedDescription.length < 10}
+                                    className="h-8 gap-2 text-xs border-primary/20 hover:border-primary"
+                                >
+                                    {isRecommending ? (
+                                        <Loader2 className="h-3 w-3 animate-spin" />
+                                    ) : (
+                                        <Sparkles className="h-3 w-3 text-primary" />
+                                    )}
+                                    Get AI Recommendation
+                                </Button>
+                            </div>
                             <Textarea
                                 id="description"
                                 placeholder="Provide a detailed description of your permit request"
                                 {...register("description")}
                             />
+                            {aiRecommendation && (
+                                <div className="mt-2 p-3 bg-primary/5 border border-primary/10 rounded-md text-xs">
+                                    <div className="flex items-center gap-2 font-semibold mb-1">
+                                        <Sparkles className="h-3 w-3 text-primary" />
+                                        <span>AI Suggestion: {aiRecommendation.recommendation}</span>
+                                    </div>
+                                    <p className="text-muted-foreground">{aiRecommendation.explanation}</p>
+                                </div>
+                            )}
                             {errors.description && (
                                 <p className="text-sm text-destructive mt-1">{errors.description.message}</p>
                             )}

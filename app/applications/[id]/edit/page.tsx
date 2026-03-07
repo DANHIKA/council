@@ -7,7 +7,7 @@ import { useQuery, useMutation, useQueryClient } from "@tanstack/react-query";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
-import { FileUpload, UploadedFile } from "@/components/ui/file-upload";
+import { FileUpload, UploadedFile } from "@/components/file-upload";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, CheckCircle2, AlertCircle, ArrowLeft, X, FileText } from "lucide-react";
 import Link from "next/link";

@@ -9,9 +9,9 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
-import { UploadedFile } from "@/components/ui/file-upload";
+import { UploadedFile } from "@/components/file-upload";
 import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Send } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Send, Sparkles, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useOfficerApplication, useAssignOfficer, useApproveApplication, useRejectApplication, useRequireCorrections, useCreateComment } from "@/lib/queries";
 import { toast } from "sonner";
@@ -23,6 +23,10 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
     const [decisionNotes, setDecisionNotes] = useState("");
     const [internalNotes, setInternalNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+
+    // AI Summary states
+    const [isSummarizing, setIsSummarizing] = useState(false);
+    const [aiSummary, setAiSummary] = useState<string | null>(null);
 
     const userRole = (session?.user as any)?.role;
     const isStaff = userRole === "OFFICER" || userRole === "ADMIN";
@@ -71,6 +75,28 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
             </div>
         );
     }
+
+    const handleSummarize = async () => {
+        if (!application) return;
+        
+        setIsSummarizing(true);
+        setAiSummary(null);
+        try {
+            const res = await fetch("/api/ai/summarize-application", {
+                method: "POST",
+                body: JSON.stringify({ applicationId: application.id }),
+            });
+            const data = await res.json();
+            if (data.error) throw new Error(data.error);
+            setAiSummary(data.summary);
+            toast.success("AI summary generated");
+        } catch (err: any) {
+            console.error("AI Summarize failed:", err);
+            toast.error("AI Summarize failed");
+        } finally {
+            setIsSummarizing(false);
+        }
+    };
 
     const handleAssign = async () => {
         try {
@@ -145,10 +171,33 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-8">
                 <div className="lg:col-span-2 space-y-6">
                     <Card>
-                        <CardHeader>
+                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                             <CardTitle>Application Details</CardTitle>
+                            <Button 
+                                variant="outline" 
+                                size="sm" 
+                                onClick={handleSummarize}
+                                disabled={isSummarizing}
+                                className="h-8 gap-2 text-xs border-primary/20 hover:border-primary"
+                            >
+                                {isSummarizing ? (
+                                    <Loader2 className="h-3 w-3 animate-spin" />
+                                ) : (
+                                    <Sparkles className="h-3 w-3 text-primary" />
+                                )}
+                                Summarize
+                            </Button>
                         </CardHeader>
                         <CardContent className="space-y-4">
+                            {aiSummary && (
+                                <div className="p-3 bg-primary/5 border border-primary/10 rounded-md text-sm mb-4">
+                                    <div className="flex items-center gap-2 font-semibold mb-1">
+                                        <Sparkles className="h-3 w-3 text-primary" />
+                                        <span>AI Summary</span>
+                                    </div>
+                                    <p className="text-muted-foreground italic">"{aiSummary}"</p>
+                                </div>
+                            )}
                             <div>
                                 <Label>Description</Label>
                                 <p className="mt-1">{application.description}</p>

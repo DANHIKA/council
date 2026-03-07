@@ -100,6 +100,30 @@ export function GoogleIframeInput({
                 }
             }
 
+            // Extract from pb parameter (Google Maps serialized string)
+            const pb = params.get('pb');
+            if (pb && !locationData.latitude) {
+                // pb usually contains !2d<longitude> and !3d<latitude>
+                const latMatch = pb.match(/!3d(-?\d+\.?\d*)/);
+                const lngMatch = pb.match(/!2d(-?\d+\.?\d*)/);
+                
+                if (latMatch) locationData.latitude = parseFloat(latMatch[1]);
+                if (lngMatch) locationData.longitude = parseFloat(lngMatch[1]);
+
+                // Extract name/address from !2s
+                 const sMatch = pb.match(/!2s([^!]+)/);
+                 if (sMatch && !locationData.address) {
+                     let decoded = decodeURIComponent(sMatch[1].replace(/\+/g, ' '));
+                     // Basic HTML entity decoding for common characters like &#39;
+                     decoded = decoded.replace(/&#39;/g, "'")
+                                    .replace(/&amp;/g, "&")
+                                    .replace(/&quot;/g, '"')
+                                    .replace(/&lt;/g, "<")
+                                    .replace(/&gt;/g, ">");
+                     locationData.address = decoded;
+                 }
+            }
+
             // Validate that we have some location data
             if (!locationData.latitude && !locationData.longitude && !locationData.placeId && !locationData.address) {
                 throw new Error("Could not extract location data from the iframe. Please ensure the iframe contains valid location information.");

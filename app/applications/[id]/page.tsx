@@ -7,7 +7,7 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
-import { UploadedFile } from "@/components/ui/file-upload";
+import { UploadedFile } from "@/components/file-upload";
 import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { ArrowLeft, Download, FileText, MessageSquare, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
