@@ -19,6 +19,93 @@ const STATUS_STATS = [
     { status: "REQUIRES_CORRECTION", label: "Needs Correction", color: "bg-orange-500" },
 ];
 
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
+import { useApplication, useApplicationDocuments } from "@/lib/queries";
+
+function ApplicationDetails({ id }: { id: string }) {
+    const { data: application, isLoading } = useApplication(id);
+    const { data: documents, isLoading: docsLoading } = useApplicationDocuments(id);
+
+    if (isLoading) return <div className="p-4 text-center">Loading...</div>;
+    if (!application) return <div className="p-4 text-center">Application not found</div>;
+
+    return (
+        <div className="space-y-6 py-4">
+            <div className="space-y-4">
+                <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Status</h4>
+                    <Badge className={getStatusColor(application.status)}>
+                        {getStatusLabel(application.status)}
+                    </Badge>
+                </div>
+                <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Description</h4>
+                    <p className="text-sm">{application.description}</p>
+                </div>
+                <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Location</h4>
+                    <p className="text-sm">{application.location}</p>
+                </div>
+                <div className="grid grid-cols-2 gap-4">
+                    <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Submitted</h4>
+                        <p className="text-sm">{formatDateTime(application.createdAt)}</p>
+                    </div>
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                <h4 className="text-sm font-medium">Documents</h4>
+                {docsLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading documents...</p>
+                ) : !documents || documents.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No documents uploaded yet.</p>
+                ) : (
+                    <div className="grid gap-2">
+                        {documents.map((doc: any) => (
+                            <div key={doc.id} className="flex items-center justify-between p-2 border rounded-md text-sm">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center text-primary">
+                                        <FileText className="h-4 w-4" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="font-medium line-clamp-1">{doc.fileName}</span>
+                                        <span className="text-[10px] text-muted-foreground">{doc.requirement?.label || "General Document"}</span>
+                                    </div>
+                                </div>
+                                <Button variant="ghost" size="icon" render={<a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" />}>
+                                    <Download className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div className="pt-4 border-t">
+                <Button className="w-full" render={<Link href={`/applications/${application.id}`} />}>
+                    Full Application View
+                </Button>
+            </div>
+        </div>
+    );
+}
+
 export default function DashboardPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
@@ -49,19 +136,17 @@ export default function DashboardPage() {
 
     return (
         <div className="container mx-auto py-8 max-w-7xl space-y-8">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
                 <div>
-                    <h1 className="text-3xl font-bold">Dashboard</h1>
+                    <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
                     <p className="text-muted-foreground">
-                        Welcome back, {session.user?.name || "User"}
+                        Welcome back, {session?.user?.name || "User"}
                     </p>
                 </div>
                 {isApplicant && (
-                    <Button asChild>
-                        <Link href="/applications/new">
-                            <PlusCircle className="h-4 w-4 mr-2" />
-                            New Application
-                        </Link>
+                    <Button render={<Link href="/applications/new" />}>
+                        <PlusCircle className="h-4 w-4 mr-2" />
+                        Submit New Application
                     </Button>
                 )}
             </div>
@@ -90,45 +175,71 @@ export default function DashboardPage() {
                         <CardTitle>Recent Applications</CardTitle>
                         <CardDescription>Your latest permit applications</CardDescription>
                     </CardHeader>
-                    <CardContent>
+                    <CardContent className="p-0">
                         {isLoading ? (
-                            <p className="text-muted-foreground">Loading...</p>
+                            <p className="text-muted-foreground p-6">Loading...</p>
                         ) : error ? (
-                            <p className="text-destructive">Failed to load applications</p>
+                            <p className="text-destructive p-6">Failed to load applications</p>
                         ) : recentApplications.length === 0 ? (
                             <p className="text-muted-foreground text-center py-8">
                                 No applications yet
                             </p>
                         ) : (
                             <div className="space-y-4">
-                                {recentApplications.map(app => (
-                                    <div key={app.id} className="flex items-center justify-between p-3 border rounded-lg">
-                                        <div className="flex-1">
-                                            <div className="flex items-center gap-2 mb-1">
-                                                <h4 className="font-medium">{app.permitType}</h4>
-                                                <Badge className={getStatusColor(app.status)}>
-                                                    {getStatusLabel(app.status)}
-                                                </Badge>
-                                            </div>
-                                            <p className="text-sm text-muted-foreground line-clamp-1">
-                                                {app.description}
-                                            </p>
-                                            <p className="text-xs text-muted-foreground">
-                                                {formatDateTime(app.createdAt)}
-                                            </p>
-                                        </div>
-                                        <Button size="sm" variant="outline" asChild>
-                                            <Link href={`/applications/${app.id}`}>
-                                                        <Eye className="h-4 w-4 mr-1" />
-                                                        View
-                                                    </Link>
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Type</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead className="text-right">Action</TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {recentApplications.map(app => (
+                                            <TableRow key={app.id}>
+                                                <TableCell className="font-medium">
+                                                    <div className="flex flex-col">
+                                                        <span>{app.permitType}</span>
+                                                        <span className="text-[10px] text-muted-foreground line-clamp-1">
+                                                            {formatDateTime(app.createdAt)}
+                                                        </span>
+                                                    </div>
+                                                </TableCell>
+                                                <TableCell>
+                                                    <Badge className={getStatusColor(app.status)}>
+                                                        {getStatusLabel(app.status)}
+                                                    </Badge>
+                                                </TableCell>
+                                                <TableCell className="text-right">
+                                                    <Sheet>
+                                                        <SheetTrigger
+                                                            render={
+                                                                <Button size="sm" variant="ghost">
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Button>
+                                                            }
+                                                        />
+                                                        <SheetContent className="w-[400px] sm:w-[540px]">
+                                                            <SheetHeader>
+                                                                <SheetTitle>{app.permitType}</SheetTitle>
+                                                                <SheetDescription>
+                                                                    Quick overview of your application
+                                                                </SheetDescription>
+                                                            </SheetHeader>
+                                                            <ApplicationDetails id={app.id} />
+                                                        </SheetContent>
+                                                    </Sheet>
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                                {applications.length > 5 && (
+                                    <div className="p-4 pt-0">
+                                        <Button variant="outline" className="w-full" render={<Link href="/applications" />}>
+                                            View All Applications
                                         </Button>
                                     </div>
-                                ))}
-                                {applications.length > 5 && (
-                                    <Button variant="outline" className="w-full" asChild>
-                                        <Link href="/applications">View All Applications</Link>
-                                    </Button>
                                 )}
                             </div>
                         )}
@@ -144,41 +255,31 @@ export default function DashboardPage() {
                     <CardContent className="space-y-3">
                         {isApplicant && (
                             <>
-                                <Button className="w-full justify-start" asChild>
-                                    <Link href="/applications/new">
-                                        <PlusCircle className="h-4 w-4 mr-2" />
-                                        Submit New Application
-                                    </Link>
+                                <Button className="w-full justify-start" render={<Link href="/applications/new" />}>
+                                    <PlusCircle className="h-4 w-4 mr-2" />
+                                    Submit New Application
                                 </Button>
-                                <Button variant="outline" className="w-full justify-start" asChild>
-                                    <Link href="/applications">
-                                        <FileText className="h-4 w-4 mr-2" />
-                                        View My Applications
-                                    </Link>
+                                <Button variant="outline" className="w-full justify-start" render={<Link href="/applications" />}>
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    View My Applications
                                 </Button>
                             </>
                         )}
                         {isStaff && (
                             <>
-                                <Button className="w-full justify-start" asChild>
-                                    <Link href="/officer/applications">
-                                        <Eye className="h-4 w-4 mr-2" />
-                                        Review Applications
-                                    </Link>
+                                <Button className="w-full justify-start" render={<Link href="/officer/applications" />}>
+                                    <Eye className="h-4 w-4 mr-2" />
+                                    Review Applications
                                 </Button>
-                                <Button variant="outline" className="w-full justify-start" asChild>
-                                    <Link href="/applications">
-                                        <FileText className="h-4 w-4 mr-2" />
-                                        All Applications
-                                    </Link>
+                                <Button variant="outline" className="w-full justify-start" render={<Link href="/applications" />}>
+                                    <FileText className="h-4 w-4 mr-2" />
+                                    All Applications
                                 </Button>
                             </>
                         )}
-                        <Button variant="outline" className="w-full justify-start" asChild>
-                            <Link href="/map">
-                                <Download className="h-4 w-4 mr-2" />
-                                Permit Map
-                            </Link>
+                        <Button variant="outline" className="w-full justify-start" render={<Link href="/map" />}>
+                            <Download className="h-4 w-4 mr-2" />
+                            Permit Map
                         </Button>
                     </CardContent>
                 </Card>
@@ -252,8 +353,8 @@ export default function DashboardPage() {
                                                 {formatDateTime(app.updatedAt)}
                                             </p>
                                         </div>
-                                        <Button size="sm" asChild>
-                                            <Link href={`/applications/${app.id}`}>Review</Link>
+                                        <Button size="sm" render={<Link href={`/applications/${app.id}`} />}>
+                                            Review
                                         </Button>
                                     </div>
                                 ))}

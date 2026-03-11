@@ -29,11 +29,11 @@ export default function AuthErrorPage() {
                         There was a problem signing you in. You will be redirected to the login page.
                     </CardDescription>
                 </CardHeader>
-                <CardContent className="text-center">
-                    <Button asChild>
-                        <Link href="/auth/login">Return to Login</Link>
+                <div className="flex justify-center pt-4">
+                    <Button render={<Link href="/auth/login" />}>
+                        Back to Login
                     </Button>
-                </CardContent>
+                </div>
             </Card>
         </div>
     );

@@ -4,17 +4,17 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
-    Home,
-    ClipboardList,
-    PlusCircle,
-    Users,
-    Map,
-    User,
-    LayoutDashboard,
-    Settings,
-    FileText,
-} from "lucide-react";
+    Home01Icon,
+    Note01Icon,
+    AddCircleIcon,
+    UserGroupIcon,
+    Location01Icon,
+    UserIcon,
+    DashboardCircleIcon,
+    File02Icon,
+} from "@hugeicons/core-free-icons";
 import type { UserRole } from "@/lib/types";
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
@@ -34,20 +34,20 @@ export function Sidebar({ className }: SidebarProps) {
         {
             title: "Dashboard",
             href: "/dashboard",
-            icon: Home,
+            icon: Home01Icon,
             active: pathname === "/dashboard",
         },
         ...(isApplicant ? [
             {
                 title: "My Applications",
                 href: "/applications",
-                icon: ClipboardList,
+                icon: Note01Icon,
                 active: pathname === "/applications",
             },
             {
                 title: "New Application",
                 href: "/applications/new",
-                icon: PlusCircle,
+                icon: AddCircleIcon,
                 active: pathname === "/applications/new",
             },
         ] : []),
@@ -55,33 +55,33 @@ export function Sidebar({ className }: SidebarProps) {
             {
                 title: "Review Queue",
                 href: "/officer/applications",
-                icon: Users,
+                icon: UserGroupIcon,
                 active: pathname === "/officer/applications",
             },
             {
                 title: "All Applications",
                 href: "/applications",
-                icon: ClipboardList,
+                icon: Note01Icon,
                 active: pathname === "/applications" && !pathname.startsWith("/applications/new"),
             },
         ] : []),
         {
             title: "Permit Map",
             href: "/map",
-            icon: Map,
+            icon: Location01Icon,
             active: pathname === "/map",
         },
         {
             title: "Profile",
             href: "/profile",
-            icon: User,
+            icon: UserIcon,
             active: pathname === "/profile",
         },
         ...(isAdmin ? [
             {
                 title: "Admin Dashboard",
                 href: "/admin",
-                icon: LayoutDashboard,
+                icon: DashboardCircleIcon,
                 active: pathname === "/admin",
             },
         ] : []),
@@ -91,7 +91,7 @@ export function Sidebar({ className }: SidebarProps) {
         <div className={cn("pb-12 border-r bg-background w-64 hidden md:flex flex-col", className)}>
             <div className="flex h-16 items-center border-b px-6">
                 <Link href="/dashboard" className="flex items-center space-x-2">
-                    <FileText className="h-6 w-6 text-primary" />
+                    <HugeiconsIcon icon={File02Icon} className="h-6 w-6 text-primary" />
                     <span className="font-bold text-xl tracking-tight">Council Portal</span>
                 </Link>
             </div>
@@ -107,7 +107,7 @@ export function Sidebar({ className }: SidebarProps) {
                                     item.active ? "bg-accent text-accent-foreground" : "transparent text-muted-foreground"
                                 )}
                             >
-                                <item.icon className="mr-2 h-4 w-4" />
+                                <HugeiconsIcon icon={item.icon} className="mr-2 h-4 w-4" />
                                 <span>{item.title}</span>
                             </Link>
                         ))}

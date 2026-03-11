@@ -1,6 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateContent } from "@/lib/gemini";
+import { generateOllamaContent } from "@/lib/ollama";
 import { auth } from "@/lib/auth";
 
 export async function POST(req: NextRequest) {
@@ -29,22 +29,40 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Application not found" }, { status: 404 });
         }
 
-        const prompt = `
-            Summarize this council permit application for an officer in 2-3 sentences.
-            Applicant: ${application.applicant.name}
-            Permit Type: ${application.permitTypeRef?.name || application.permitType}
-            Description: ${application.description}
-            Location: ${application.location}
-            Number of documents: ${application.documents.length}
-            
-            Focus on the key intent and anything that might require special attention.
-        `;
+        const prompt = `### INSTRUCTION ###
+You are a Senior Council Planning Officer. Summarize the following permit application into a professional Briefing Note.
+Focus on the CORE INTENT, the SCALE of the project, and any POTENTIAL CONCERNS.
 
-        const summary = await generateContent(prompt);
+### APPLICATION DATA ###
+Applicant: ${application.applicant.name}
+Permit Type: ${application.permitTypeRef?.name || application.permitType}
+Project Description: "${application.description}"
+Location: ${application.location}
+Attached Documents: ${application.documents.length} files
+
+### BRIEFING NOTE FORMAT ###
+- **Project Scope:** (1 sentence on what they want to do)
+- **Key Details:** (Location and scale)
+- **Document Status:** (Assessment of the ${application.documents.length} files provided)
+- **Officer Initial Assessment:** (Is this a standard or complex request?)
+
+Briefing Note:`;
+
+        const summary = await generateOllamaContent(prompt);
 
         return NextResponse.json({ summary });
-    } catch (error) {
+    } catch (error: any) {
         console.error("Auto-summary error:", error);
+        
+        // Handle specific API quota errors
+        const isQuotaError = error?.status === 429 || error?.message?.includes("429") || error?.message?.includes("quota");
+        if (isQuotaError) {
+            return NextResponse.json({ 
+                error: "AI is currently busy", 
+                summary: "AI summary is temporarily unavailable due to high demand. Please try again in a few seconds." 
+            }, { status: 429 });
+        }
+
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

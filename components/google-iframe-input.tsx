@@ -7,7 +7,14 @@ import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Badge } from "@/components/ui/badge";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { MapPin, Globe, CheckCircle2, XCircle, Loader2 } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { 
+    Location01Icon, 
+    Globe02Icon, 
+    CheckListIcon, 
+    Cancel01Icon, 
+    Loading03Icon 
+} from "@hugeicons/core-free-icons";
 
 interface GoogleIframeInputProps {
     onLocationExtracted?: (locationData: {
@@ -176,7 +183,7 @@ export function GoogleIframeInput({
         <Card className="border-dashed">
             <CardHeader className="pb-3">
                 <CardTitle className="text-sm font-medium flex items-center gap-2">
-                    <MapPin className="h-4 w-4 text-primary" />
+                    <HugeiconsIcon icon={Location01Icon} className="h-4 w-4 text-primary" />
                     Extract Location from Google Maps
                 </CardTitle>
                 <CardDescription className="text-xs">
@@ -196,13 +203,13 @@ export function GoogleIframeInput({
                     <div className="flex gap-2">
                         {extractedData && !error && (
                             <Badge variant="outline" className="bg-green-50 text-green-700 border-green-200 text-[10px]">
-                                <CheckCircle2 className="h-3 w-3 mr-1" />
+                                <HugeiconsIcon icon={CheckListIcon} className="h-3 w-3 mr-1" />
                                 Location Extracted
                             </Badge>
                         )}
                         {error && (
                             <Badge variant="outline" className="bg-red-50 text-red-700 border-red-200 text-[10px]">
-                                <XCircle className="h-3 w-3 mr-1" />
+                                <HugeiconsIcon icon={Cancel01Icon} className="h-3 w-3 mr-1" />
                                 Invalid Code
                             </Badge>
                         )}
@@ -214,9 +221,9 @@ export function GoogleIframeInput({
                         disabled={!iframeCode.trim() || disabled || isProcessing}
                     >
                         {isProcessing ? (
-                            <Loader2 className="h-3 w-3 animate-spin mr-1" />
+                            <HugeiconsIcon icon={Loading03Icon} className="h-3 w-3 animate-spin mr-1" />
                         ) : (
-                            <Globe className="h-3 w-3 mr-1" />
+                            <HugeiconsIcon icon={Globe02Icon} className="h-3 w-3 mr-1" />
                         )}
                         Extract
                     </Button>

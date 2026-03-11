@@ -1,10 +1,24 @@
 "use client";
 
-import { useState, useRef, useEffect } from "react";
+import { useState, useEffect } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
+import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
-import { MessageSquare, X, Send, Sparkles, Loader2, Minus } from "lucide-react";
+import { 
+    Conversation, 
+    ConversationContent, 
+    ConversationScrollButton,
+    ConversationEmptyState
+} from "@/components/ui/conversation";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { 
+    Chat01Icon, 
+    Cancel01Icon, 
+    SentIcon, 
+    SparklesIcon, 
+    Loading03Icon, 
+    MinusSignIcon 
+} from "@hugeicons/core-free-icons";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
@@ -22,13 +36,6 @@ export function AIChatSupport() {
     ]);
     const [input, setInput] = useState("");
     const [isLoading, setIsLoading] = useState(false);
-    const scrollRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        if (scrollRef.current) {
-            scrollRef.current.scrollTop = scrollRef.current.scrollHeight;
-        }
-    }, [messages]);
 
     // Only show to APPLICANTS (citizens) or guests
     const userRole = (session?.user as any)?.role;
@@ -75,7 +82,7 @@ export function AIChatSupport() {
                     size="icon" 
                     className="h-14 w-14 rounded-full shadow-lg hover:scale-110 transition-transform bg-primary text-primary-foreground"
                 >
-                    <MessageSquare className="h-6 w-6" />
+                    <HugeiconsIcon icon={Chat01Icon} className="h-6 w-6" />
                 </Button>
             </div>
         );
@@ -86,10 +93,10 @@ export function AIChatSupport() {
             "fixed bottom-6 right-6 z-50 w-80 sm:w-96 transition-all duration-300 ease-in-out",
             isMinimized ? "h-14" : "h-[500px]"
         )}>
-            <Card className="h-full flex flex-col shadow-2xl border-primary/20 overflow-hidden">
-                <CardHeader className="p-4 bg-primary text-primary-foreground flex flex-row items-center justify-between space-y-0">
+            <Card className="h-full flex flex-col shadow-2xl border-primary/20 overflow-hidden bg-background">
+                <CardHeader className="p-4 bg-primary text-primary-foreground flex flex-row items-center justify-between space-y-0 shrink-0">
                     <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <Sparkles className="h-4 w-4" />
+                        <HugeiconsIcon icon={SparklesIcon} className="h-4 w-4" />
                         Council Assistant
                     </CardTitle>
                     <div className="flex items-center gap-1">
@@ -99,7 +106,7 @@ export function AIChatSupport() {
                             className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10"
                             onClick={() => setIsMinimized(!isMinimized)}
                         >
-                            <Minus className="h-4 w-4" />
+                            <HugeiconsIcon icon={MinusSignIcon} className="h-4 w-4" />
                         </Button>
                         <Button 
                             variant="ghost" 
@@ -107,44 +114,52 @@ export function AIChatSupport() {
                             className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10"
                             onClick={() => setIsOpen(false)}
                         >
-                            <X className="h-4 w-4" />
+                            <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
                         </Button>
                     </div>
                 </CardHeader>
                 
                 {!isMinimized && (
                     <>
-                        <CardContent 
-                            ref={scrollRef}
-                            className="flex-1 overflow-y-auto p-4 space-y-4 bg-muted/30 scrollbar-thin"
-                        >
-                            {messages.map((m, i) => (
-                                <div 
-                                    key={i} 
-                                    className={cn(
-                                        "flex",
-                                        m.role === "user" ? "justify-end" : "justify-start"
-                                    )}
-                                >
-                                    <div className={cn(
-                                        "max-w-[80%] p-3 rounded-lg text-sm",
-                                        m.role === "user" 
-                                            ? "bg-primary text-primary-foreground rounded-br-none" 
-                                            : "bg-background border border-primary/10 rounded-bl-none shadow-sm"
-                                    )}>
-                                        {m.content}
+                        <Conversation className="bg-muted/30">
+                            <ConversationContent className="space-y-4">
+                                {messages.length === 0 ? (
+                                    <ConversationEmptyState 
+                                        icon={<SparklesIcon className="h-8 w-8 opacity-20" />}
+                                        title="Council Assistant"
+                                        description="Ask me anything about your permit application."
+                                    />
+                                ) : (
+                                    messages.map((m, i) => (
+                                        <div 
+                                            key={i} 
+                                            className={cn(
+                                                "flex",
+                                                m.role === "user" ? "justify-end" : "justify-start"
+                                            )}
+                                        >
+                                            <div className={cn(
+                                                "max-w-[85%] p-3 rounded-2xl text-sm shadow-sm",
+                                                m.role === "user" 
+                                                    ? "bg-primary text-primary-foreground rounded-tr-none" 
+                                                    : "bg-background border border-primary/10 rounded-tl-none"
+                                            )}>
+                                                {m.content}
+                                            </div>
+                                        </div>
+                                    ))
+                                )}
+                                {isLoading && (
+                                    <div className="flex justify-start">
+                                        <div className="bg-background border border-primary/10 p-3 rounded-2xl rounded-tl-none shadow-sm">
+                                            <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin text-primary" />
+                                        </div>
                                     </div>
-                                </div>
-                            ))}
-                            {isLoading && (
-                                <div className="flex justify-start">
-                                    <div className="bg-background border border-primary/10 p-3 rounded-lg rounded-bl-none shadow-sm">
-                                        <Loader2 className="h-4 w-4 animate-spin text-primary" />
-                                    </div>
-                                </div>
-                            )}
-                        </CardContent>
-                        <CardFooter className="p-4 bg-background border-t">
+                                )}
+                            </ConversationContent>
+                            <ConversationScrollButton />
+                        </Conversation>
+                        <CardFooter className="p-4 bg-background border-t shrink-0">
                             <form 
                                 onSubmit={(e) => { e.preventDefault(); handleSend(); }}
                                 className="flex w-full items-center gap-2"
@@ -154,14 +169,15 @@ export function AIChatSupport() {
                                     value={input}
                                     onChange={(e) => setInput(e.target.value)}
                                     disabled={isLoading}
-                                    className="flex-1"
+                                    className="flex-1 rounded-full bg-muted/50 focus:bg-background transition-all"
                                 />
                                 <Button 
                                     type="submit" 
                                     size="icon" 
                                     disabled={isLoading || !input.trim()}
+                                    className="rounded-full shrink-0 shadow-md active:scale-95 transition-transform"
                                 >
-                                    <Send className="h-4 w-4" />
+                                    <HugeiconsIcon icon={SentIcon} className="h-4 w-4" />
                                 </Button>
                             </form>
                         </CardFooter>
@@ -171,3 +187,4 @@ export function AIChatSupport() {
         </div>
     );
 }
+

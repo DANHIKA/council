@@ -151,7 +151,9 @@ export default function AdminPage() {
                                     <TableCell>
                                         <Select
                                             value={user.role}
-                                            onValueChange={(val) => handleRoleChange(user.id, val)}
+                                            onValueChange={(val) => {
+                                                if (val) handleRoleChange(user.id, val);
+                                            }}
                                             disabled={user.id === session?.user?.id}
                                         >
                                             <SelectTrigger className="w-[130px] h-8">

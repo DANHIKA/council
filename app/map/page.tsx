@@ -178,12 +178,11 @@ export default function PermitMapPage() {
                                                     {formatDateTime(app.createdAt)}
                                                 </p>
                                             </div>
-                                            <Button size="sm" variant="outline" asChild>
-                                                                <Link href={`/applications/${app.id}`}>
-                                                                    <Eye className="h-4 w-4 mr-1" />
-                                                                    View
-                                                                </Link>
-                                                            </Button>
+                                            <div className="flex items-center gap-2">
+                                                <Button size="sm" variant="outline" render={<Link href={`/applications/${app.id}`} />}>
+                                                    View
+                                                </Button>
+                                            </div>
                                         </div>
                                     </div>
                                 ))

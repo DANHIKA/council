@@ -3,24 +3,25 @@
 import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { useForm, Controller } from "react-hook-form";
+import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
 import { Button } from "@/components/ui/button";
-import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { Badge } from "@/components/ui/badge";
-import { FileUpload, UploadedFile } from "@/components/file-upload";
+import { FileUpload } from "@/components/file-upload";
+import { VoiceInput } from "@/components/voice-input";
 import { GoogleIframeInput } from "@/components/google-iframe-input";
 import { Alert, AlertDescription } from "@/components/ui/alert";
-import { Loader2, CheckCircle2, AlertCircle, Upload, X, FileText, Sparkles } from "lucide-react";
+import { Loader2, CheckCircle2, AlertCircle, X, FileText, Sparkles } from "lucide-react";
 import Link from "next/link";
 import { applicationsApi, permitTypesApi } from "@/lib/services";
 import type { PermitType, UploadedDocument } from "@/lib/types";
 import { toast } from "sonner";
+import { cn } from "@/lib/utils";
 
 const applicationSchema = z.object({
     permitTypeId: z.string().min(1, "Please select a permit type"),
@@ -66,11 +67,12 @@ export default function NewApplicationPage() {
         resolver: zodResolver(applicationSchema),
     });
 
-    const watchedPermitTypeId = watch("permitTypeId") || "";
-    const watchedDescription = watch("description") || "";
+    const watchedPermitTypeId = useWatch({ control, name: "permitTypeId" }) || "";
+    const watchedDescription = useWatch({ control, name: "description" }) || "";
 
     const getAIRecommendation = async () => {
-        if (watchedDescription.length < 10) {
+        const descriptionValue = watch("description") || "";
+        if (descriptionValue.length < 10) {
             toast.error("Please provide at least 10 characters for a recommendation.");
             return;
         }
@@ -80,7 +82,7 @@ export default function NewApplicationPage() {
         try {
             const res = await fetch("/api/ai/recommend-permit", {
                 method: "POST",
-                body: JSON.stringify({ description: watchedDescription }),
+                body: JSON.stringify({ description: descriptionValue }),
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
@@ -199,61 +201,61 @@ export default function NewApplicationPage() {
 
     if (success) {
         return (
-            <div className="container mx-auto py-8">
-                <Card className="max-w-md mx-auto border-green-200 bg-green-50">
-                    <CardContent className="p-8 text-center">
-                        <div className="mx-auto w-16 h-16 bg-green-100 rounded-full flex items-center justify-center mb-4">
-                            <CheckCircle2 className="h-8 w-8 text-green-600" />
-                        </div>
-                        <h2 className="text-2xl font-bold text-green-800 mb-2">Application Submitted!</h2>
-                        <p className="text-green-700 mb-6">
-                            Your permit application has been successfully submitted and is now under review.
-                            You will be notified of any updates.
-                        </p>
-                        <div className="flex flex-col gap-3">
-                            <Button asChild className="w-full bg-green-600 hover:bg-green-700">
-                                <Link href="/dashboard">Return to Dashboard</Link>
-                            </Button>
-                            <Button asChild variant="outline" className="w-full border-green-200 text-green-700 hover:bg-green-100">
-                                <Link href="/applications">View My Applications</Link>
-                            </Button>
-                        </div>
-                    </CardContent>
-                </Card>
+            <div className="container mx-auto py-24 max-w-md text-center">
+                <div className="mb-8 flex justify-center">
+                    <div className="w-20 h-20 bg-green-100 dark:bg-green-900/30 rounded-full flex items-center justify-center animate-in zoom-in-50 duration-500">
+                        <CheckCircle2 className="h-10 w-10 text-green-600 dark:text-green-400" />
+                    </div>
+                </div>
+                <h2 className="text-3xl font-bold tracking-tight mb-3">Application Submitted!</h2>
+                <p className="text-muted-foreground text-lg mb-10 leading-relaxed">
+                    Your permit application has been successfully submitted and is now under review.
+                    You will be notified of any updates.
+                </p>
+                <div className="flex flex-col gap-3">
+                    <Button render={<Link href="/dashboard" />} size="lg" className="w-full bg-green-600 hover:bg-green-700 shadow-lg shadow-green-600/20">
+                        Return to Dashboard
+                    </Button>
+                    <Button render={<Link href="/applications" />} variant="ghost" size="lg" className="w-full text-muted-foreground hover:text-foreground">
+                        View My Applications
+                    </Button>
+                </div>
             </div>
         );
     }
 
     return (
-        <div className="container mx-auto py-8 max-w-4xl">
-            <div className="mb-8">
-                <h1 className="text-3xl font-bold">New Permit Application</h1>
-                <p className="text-muted-foreground">Fill in the details and upload required documents</p>
+        <div className="container mx-auto py-12 max-w-3xl">
+            <div className="mb-10 text-center">
+                <h1 className="text-3xl font-bold tracking-tight mb-2">New Permit Application</h1>
+                <p className="text-muted-foreground text-lg">Complete the form below to submit your permit request.</p>
             </div>
 
             {error && (
-                <Alert variant="destructive" className="mb-6">
+                <Alert variant="destructive" className="mb-8 border-destructive/50 bg-destructive/5">
                     <AlertCircle className="h-4 w-4" />
                     <AlertDescription>{error}</AlertDescription>
                 </Alert>
             )}
 
-            <form onSubmit={handleSubmit(onSubmit)} className="space-y-8">
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Application Details</CardTitle>
-                        <CardDescription>Basic information about your permit request</CardDescription>
-                    </CardHeader>
-                    <CardContent className="space-y-4">
-                        <div>
-                            <Label htmlFor="permitTypeId">Permit Type *</Label>
+            <form onSubmit={handleSubmit(onSubmit)} className="space-y-12">
+                {/* Section: Basic Information */}
+                <section className="space-y-6">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="h-8 w-1 bg-primary rounded-full" />
+                        <h2 className="text-xl font-semibold">Basic Information</h2>
+                    </div>
+                    
+                    <div className="grid gap-6 p-1">
+                        <div className="space-y-2">
+                            <Label htmlFor="permitTypeId" className="text-sm font-medium">Permit Type <span className="text-destructive">*</span></Label>
                             <Controller
                                 name="permitTypeId"
                                 control={control}
                                 render={({ field }) => (
                                     <Select onValueChange={field.onChange} value={field.value || ""}>
-                                        <SelectTrigger>
-                                            <SelectValue placeholder="Select a permit type" />
+                                        <SelectTrigger className="h-11 bg-background/50 focus:bg-background transition-colors">
+                                            <SelectValue placeholder="What type of permit do you need?" />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {permitTypes.map(pt => (
@@ -266,186 +268,225 @@ export default function NewApplicationPage() {
                                 )}
                             />
                             {errors.permitTypeId && (
-                                <p className="text-sm text-destructive mt-1">{errors.permitTypeId.message}</p>
+                                <p className="text-sm text-destructive font-medium">{errors.permitTypeId.message}</p>
                             )}
                         </div>
 
-                        <div>
-                            <div className="flex items-center justify-between mb-2">
-                                <Label htmlFor="description">Description *</Label>
-                                <Button 
-                                    type="button" 
-                                    variant="outline" 
-                                    size="sm" 
-                                    onClick={getAIRecommendation}
-                                    disabled={isRecommending || watchedDescription.length < 10}
-                                    className="h-8 gap-2 text-xs border-primary/20 hover:border-primary"
-                                >
-                                    {isRecommending ? (
-                                        <Loader2 className="h-3 w-3 animate-spin" />
-                                    ) : (
-                                        <Sparkles className="h-3 w-3 text-primary" />
-                                    )}
-                                    Get AI Recommendation
-                                </Button>
+                        <div className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <Label htmlFor="description" className="text-sm font-medium">Description <span className="text-destructive">*</span></Label>
+                                <div className="flex items-center gap-2">
+                                    <VoiceInput 
+                                        onTranscript={(transcript) => {
+                                            const currentVal = watch("description") || "";
+                                            setValue("description", currentVal ? `${currentVal} ${transcript}` : transcript);
+                                        }}
+                                    />
+                                    <Button 
+                                        type="button" 
+                                        variant="ghost" 
+                                        size="sm" 
+                                        onClick={getAIRecommendation}
+                                        disabled={isRecommending || watchedDescription.length < 10}
+                                        className="h-8 gap-2 text-xs text-primary hover:text-primary hover:bg-primary/5 font-medium"
+                                    >
+                                        {isRecommending ? (
+                                            <Loader2 className="h-3 w-3 animate-spin" />
+                                        ) : (
+                                            <Sparkles className="h-3 w-3" />
+                                        )}
+                                        AI Assist
+                                    </Button>
+                                </div>
                             </div>
                             <Textarea
                                 id="description"
-                                placeholder="Provide a detailed description of your permit request"
+                                placeholder="Tell us more about your permit request (min. 10 characters)..."
+                                className="min-h-[120px] bg-background/50 focus:bg-background transition-colors resize-none"
                                 {...register("description")}
                             />
                             {aiRecommendation && (
-                                <div className="mt-2 p-3 bg-primary/5 border border-primary/10 rounded-md text-xs">
-                                    <div className="flex items-center gap-2 font-semibold mb-1">
-                                        <Sparkles className="h-3 w-3 text-primary" />
+                                <div className="mt-2 p-4 bg-primary/5 border border-primary/10 rounded-xl text-sm animate-in fade-in slide-in-from-top-1">
+                                    <div className="flex items-center gap-2 font-semibold text-primary mb-1.5">
+                                        <Sparkles className="h-4 w-4" />
                                         <span>AI Suggestion: {aiRecommendation.recommendation}</span>
                                     </div>
-                                    <p className="text-muted-foreground">{aiRecommendation.explanation}</p>
+                                    <p className="text-muted-foreground leading-relaxed">{aiRecommendation.explanation}</p>
                                 </div>
                             )}
                             {errors.description && (
-                                <p className="text-sm text-destructive mt-1">{errors.description.message}</p>
+                                <p className="text-sm text-destructive font-medium">{errors.description.message}</p>
                             )}
                         </div>
+                    </div>
+                </section>
 
-                        <div>
-                            <Label htmlFor="location">Location *</Label>
+                {/* Section: Location */}
+                <section className="space-y-6">
+                    <div className="flex items-center gap-2 mb-2">
+                        <div className="h-8 w-1 bg-primary rounded-full" />
+                        <h2 className="text-xl font-semibold">Location Details</h2>
+                    </div>
+
+                    <div className="grid gap-6 p-1">
+                        <div className="space-y-2">
+                            <Label htmlFor="location" className="text-sm font-medium">Physical Address <span className="text-destructive">*</span></Label>
                             <Input
                                 id="location"
-                                placeholder="Physical address or location of the activity"
+                                placeholder="Where will the activity take place?"
+                                className="h-11 bg-background/50 focus:bg-background transition-colors"
                                 {...register("location")}
                             />
                             {errors.location && (
-                                <p className="text-sm text-destructive mt-1">{errors.location.message}</p>
+                                <p className="text-sm text-destructive font-medium">{errors.location.message}</p>
                             )}
                         </div>
 
-                        <GoogleIframeInput
-                            onLocationExtracted={(locationData) => {
-                                setValue("latitude", locationData.latitude);
-                                setValue("longitude", locationData.longitude);
-                                if (locationData.address) {
-                                    setValue("location", locationData.address);
-                                }
-                            }}
-                        />
+                        <div className="pt-2">
+                            <GoogleIframeInput
+                                onLocationExtracted={(locationData) => {
+                                    setValue("latitude", locationData.latitude);
+                                    setValue("longitude", locationData.longitude);
+                                    if (locationData.address) {
+                                        setValue("location", locationData.address);
+                                    }
+                                }}
+                            />
+                        </div>
 
-                        <div className="grid grid-cols-2 gap-4">
-                            <div>
-                                <Label htmlFor="latitude">Latitude (optional)</Label>
+                        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 pt-2">
+                            <div className="space-y-2">
+                                <Label htmlFor="latitude" className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Latitude</Label>
                                 <Input
                                     id="latitude"
                                     type="number"
                                     step="any"
                                     placeholder="e.g. -26.2041"
+                                    className="bg-background/50 focus:bg-background transition-colors"
                                     {...register("latitude", { valueAsNumber: true })}
                                 />
                             </div>
-                            <div>
-                                <Label htmlFor="longitude">Longitude (optional)</Label>
+                            <div className="space-y-2">
+                                <Label htmlFor="longitude" className="text-xs text-muted-foreground uppercase tracking-wider font-semibold">Longitude</Label>
                                 <Input
                                     id="longitude"
                                     type="number"
                                     step="any"
                                     placeholder="e.g. 28.0473"
+                                    className="bg-background/50 focus:bg-background transition-colors"
                                     {...register("longitude", { valueAsNumber: true })}
                                 />
                             </div>
                         </div>
-                    </CardContent>
-                </Card>
+                    </div>
+                </section>
 
+                {/* Section: Documents */}
                 {selectedPermitType && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle>Required Documents</CardTitle>
-                            <CardDescription>
-                                Upload the required documents for <strong>{selectedPermitType.name}</strong>
-                            </CardDescription>
-                        </CardHeader>
-                        <CardContent className="space-y-6">
+                    <section className="space-y-6 animate-in fade-in slide-in-from-bottom-2 duration-500">
+                        <div className="flex items-center gap-2 mb-2">
+                            <div className="h-8 w-1 bg-primary rounded-full" />
+                            <h2 className="text-xl font-semibold">Supporting Documents</h2>
+                        </div>
+                        
+                        <p className="text-sm text-muted-foreground px-1">
+                            Please upload the following required documents for your <strong>{selectedPermitType.name}</strong> application.
+                        </p>
+
+                        <div className="space-y-4 px-1">
                             {selectedPermitType.requirements.map(req => {
                                 const pendingFile = getPendingFileForRequirement(req.id);
                                 const satisfied = !!pendingFile;
                                 
                                 return (
-                                    <div key={req.id} className="space-y-3 p-4 border rounded-lg bg-slate-50/50">
-                                        <div className="flex items-center justify-between">
-                                            <div className="flex items-center gap-2">
-                                                <Label className="text-base font-medium">
-                                                    {req.label}
-                                                    {req.required && <span className="text-destructive ml-1">*</span>}
-                                                </Label>
-                                                {req.required && (
-                                                    <Badge variant={satisfied ? "default" : "outline"} className={satisfied ? "bg-green-600" : ""}>
-                                                        {satisfied ? (
-                                                            <><CheckCircle2 className="h-3 w-3 mr-1" /> Ready to Upload</>
-                                                        ) : (
-                                                            "Required"
-                                                        )}
-                                                    </Badge>
+                                    <div key={req.id} className="group relative border rounded-2xl p-5 transition-all hover:border-primary/30 hover:shadow-sm bg-card/30">
+                                        <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-sm font-semibold text-foreground">
+                                                        {req.label}
+                                                    </span>
+                                                    {req.required && (
+                                                        <Badge variant={satisfied ? "default" : "outline"} 
+                                                            className={cn(
+                                                                "text-[10px] uppercase tracking-wider h-5 px-1.5",
+                                                                satisfied ? "bg-green-600 hover:bg-green-600 border-none" : "text-muted-foreground"
+                                                            )}
+                                                        >
+                                                            {satisfied ? "Uploaded" : "Required"}
+                                                        </Badge>
+                                                    )}
+                                                </div>
+                                                {req.description && (
+                                                    <p className="text-xs text-muted-foreground max-w-md">{req.description}</p>
+                                                )}
+                                            </div>
+                                            
+                                            <div className="flex-shrink-0">
+                                                {pendingFile ? (
+                                                    <div className="flex items-center gap-3 bg-background border rounded-xl p-2 pr-1 shadow-sm animate-in zoom-in-95">
+                                                        <div className="h-8 w-8 bg-primary/10 rounded-lg flex items-center justify-center">
+                                                            <FileText className="h-4 w-4 text-primary" />
+                                                        </div>
+                                                        <div className="min-w-0 flex-1 pr-2">
+                                                            <p className="font-medium text-xs truncate max-w-[120px]">{pendingFile.file.name}</p>
+                                                            <p className="text-[10px] text-muted-foreground">
+                                                                {(pendingFile.file.size / 1024).toFixed(1)} KB
+                                                            </p>
+                                                        </div>
+                                                        <Button 
+                                                            type="button" 
+                                                            variant="ghost" 
+                                                            size="icon-xs"
+                                                            onClick={() => handleRemovePendingFile(pendingFile.id)}
+                                                            className="text-muted-foreground hover:text-destructive h-7 w-7"
+                                                        >
+                                                            <X className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    </div>
+                                                ) : (
+                                                    <div className="w-full sm:w-auto">
+                                                        <FileUpload
+                                                            onUpload={(files) => handleFileSelect(files, req.id)}
+                                                            accept={req.acceptMime}
+                                                        />
+                                                    </div>
                                                 )}
                                             </div>
                                         </div>
-                                        
-                                        {req.description && (
-                                            <p className="text-sm text-muted-foreground">{req.description}</p>
-                                        )}
-                                        
-                                        {pendingFile ? (
-                                            <div className="flex items-center justify-between p-3 bg-white border rounded-md">
-                                                <div className="flex items-center gap-3">
-                                                    <div className="h-10 w-10 bg-slate-100 rounded flex items-center justify-center">
-                                                        <FileText className="h-5 w-5 text-slate-500" />
-                                                    </div>
-                                                    <div>
-                                                        <p className="font-medium text-sm truncate max-w-[200px]">{pendingFile.file.name}</p>
-                                                        <p className="text-xs text-muted-foreground">
-                                                            {(pendingFile.file.size / 1024).toFixed(1)} KB
-                                                        </p>
-                                                    </div>
-                                                </div>
-                                                <Button 
-                                                    type="button" 
-                                                    variant="ghost" 
-                                                    size="icon"
-                                                    onClick={() => handleRemovePendingFile(pendingFile.id)}
-                                                    className="text-muted-foreground hover:text-destructive"
-                                                >
-                                                    <X className="h-4 w-4" />
-                                                </Button>
-                                            </div>
-                                        ) : (
-                                            <FileUpload
-                                                onUpload={(files) => handleFileSelect(files, req.id)}
-                                                accept={req.acceptMime}
-                                            />
-                                        )}
                                     </div>
                                 );
                             })}
-                        </CardContent>
-                    </Card>
+                        </div>
+                    </section>
                 )}
 
-                <div className="flex justify-end gap-4">
-                    <Button type="button" variant="outline" asChild>
-                        <Link href="/dashboard">Cancel</Link>
+                {/* Footer Actions */}
+                <div className="pt-10 border-t flex flex-col sm:flex-row items-center justify-between gap-4">
+                    <Button type="button" variant="ghost" render={<Link href="/dashboard" />} className="text-muted-foreground hover:text-foreground">
+                        Cancel Application
                     </Button>
-                    <Button 
-                        type="submit" 
-                        disabled={!selectedPermitType || !allRequiredSatisfied || submitting}
-                        className="min-w-[150px]"
-                    >
-                        {submitting ? (
-                            <>
-                                <Loader2 className="h-4 w-4 mr-2 animate-spin" />
-                                {submitStep || "Submitting..."}
-                            </>
-                        ) : (
-                            "Submit Application"
+                    <div className="flex items-center gap-3 w-full sm:w-auto">
+                        {!allRequiredSatisfied && selectedPermitType && (
+                            <span className="text-xs text-muted-foreground hidden md:inline-block mr-2">
+                                Please upload all required documents
+                            </span>
                         )}
-                    </Button>
+                        <Button 
+                            type="submit" 
+                            disabled={!selectedPermitType || !allRequiredSatisfied || submitting}
+                            className="w-full sm:w-[200px] h-11 text-base font-semibold shadow-lg shadow-primary/20 transition-all active:scale-[0.98]"
+                        >
+                            {submitting ? (
+                                <>
+                                    <Loader2 className="h-4 w-4 mr-2 animate-spin" />
+                                    {submitStep || "Submitting..."}
+                                </>
+                            ) : (
+                                "Submit Application"
+                            )}
+                        </Button>
+                    </div>
                 </div>
             </form>
         </div>

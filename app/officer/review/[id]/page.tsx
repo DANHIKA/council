@@ -68,9 +68,12 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
     if (error || !application) {
         return (
             <div className="container mx-auto py-8 max-w-5xl">
-                <p className="text-destructive">Failed to load application</p>
-                <Button variant="outline" className="mt-4" asChild>
-                    <Link href="/officer/applications">Back to Queue</Link>
+                <div className="rounded-md bg-destructive/15 p-4 text-destructive flex items-center gap-3 mb-4">
+                    <AlertCircle className="h-4 w-4" />
+                    <p className="text-sm font-medium">Failed to load application details.</p>
+                </div>
+                <Button variant="outline" className="mt-4" render={<Link href="/officer/applications" />}>
+                    Back to Queue
                 </Button>
             </div>
         );
@@ -154,10 +157,8 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
     return (
         <div className="container mx-auto py-8 max-w-5xl space-y-8">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" asChild>
-                    <Link href="/officer/applications">
-                        <ArrowLeft className="h-4 w-4" />
-                    </Link>
+                <Button variant="ghost" size="icon" render={<Link href="/officer/applications" />} className="rounded-full h-10 w-10">
+                    <ArrowLeft className="h-5 w-5 text-muted-foreground" />
                 </Button>
                 <div>
                     <h1 className="text-2xl font-bold">Review Application</h1>
@@ -195,7 +196,7 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
                                         <Sparkles className="h-3 w-3 text-primary" />
                                         <span>AI Summary</span>
                                     </div>
-                                    <p className="text-muted-foreground italic">"{aiSummary}"</p>
+                                    <p className="text-muted-foreground italic">&quot;{aiSummary}&quot;</p>
                                 </div>
                             )}
                             <div>

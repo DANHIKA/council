@@ -5,13 +5,21 @@ import { prisma } from "@/lib/prisma";
 export async function GET(req: NextRequest) {
     try {
         const session = await auth();
+        console.log("GET /api/officer/applications - session:", {
+            userId: session?.user?.id,
+            email: session?.user?.email,
+            role: (session?.user as any)?.role
+        });
+
         if (!session?.user?.id) {
+            console.log("GET /api/officer/applications - Unauthorized");
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const userRole = (session.user as any).role as string | undefined;
         const isStaff = userRole === "OFFICER" || userRole === "ADMIN";
         if (!isStaff) {
+            console.log(`GET /api/officer/applications - Forbidden: user role ${userRole} is not staff`);
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
@@ -21,6 +29,8 @@ export async function GET(req: NextRequest) {
         const page = Math.max(parseInt(searchParams.get("page") || "1", 10), 1);
         const limit = Math.min(Math.max(parseInt(searchParams.get("limit") || "20", 10), 1), 100);
         const skip = (page - 1) * limit;
+
+        console.log("GET /api/officer/applications - query params:", { status, q, page, limit });
 
         const where: any = {};
         if (status) where.status = status;
@@ -49,8 +59,10 @@ export async function GET(req: NextRequest) {
             }),
         ]);
 
+        console.log(`GET /api/officer/applications - found ${applications.length} applications (total: ${total})`);
+
         return NextResponse.json({
-            applications,
+            data: applications,
             pagination: {
                 page,
                 limit,

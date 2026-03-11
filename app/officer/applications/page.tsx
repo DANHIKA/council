@@ -9,7 +9,7 @@ import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
-import { Search, Filter, Eye } from "lucide-react";
+import { Search, Filter, Eye, FileText, Download } from "lucide-react";
 import Link from "next/link";
 import { useOfficerQueue } from "@/lib/queries";
 
@@ -21,6 +21,98 @@ const STATUS_OPTIONS = [
     { value: "REJECTED", label: "Rejected" },
     { value: "REQUIRES_CORRECTION", label: "Requires Correction" },
 ];
+
+import {
+    Table,
+    TableBody,
+    TableCell,
+    TableHead,
+    TableHeader,
+    TableRow,
+} from "@/components/ui/table";
+import {
+    Sheet,
+    SheetContent,
+    SheetDescription,
+    SheetHeader,
+    SheetTitle,
+    SheetTrigger,
+} from "@/components/ui/sheet";
+import { useApplication, useApplicationDocuments } from "@/lib/queries";
+
+function ApplicationDetails({ id }: { id: string }) {
+    const { data: application, isLoading } = useApplication(id);
+    const { data: documents, isLoading: docsLoading } = useApplicationDocuments(id);
+
+    if (isLoading) return <div className="p-4 text-center">Loading...</div>;
+    if (!application) return <div className="p-4 text-center">Application not found</div>;
+
+    return (
+        <div className="space-y-6 py-4">
+            <div className="space-y-4">
+                <div className="flex items-center justify-between">
+                    <div>
+                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Status</h4>
+                        <Badge className={getStatusColor(application.status)}>
+                            {getStatusLabel(application.status)}
+                        </Badge>
+                    </div>
+                    <div className="text-right">
+                        <h4 className="text-sm font-medium text-muted-foreground mb-1">Submitted</h4>
+                        <p className="text-sm">{formatDateTime(application.createdAt)}</p>
+                    </div>
+                </div>
+                <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Applicant</h4>
+                    <p className="text-sm font-medium">{application.applicant.name}</p>
+                    <p className="text-xs text-muted-foreground">{application.applicant.email}</p>
+                </div>
+                <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Description</h4>
+                    <p className="text-sm">{application.description}</p>
+                </div>
+                <div>
+                    <h4 className="text-sm font-medium text-muted-foreground mb-1">Location</h4>
+                    <p className="text-sm">{application.location}</p>
+                </div>
+            </div>
+
+            <div className="space-y-3">
+                <h4 className="text-sm font-medium">Documents</h4>
+                {docsLoading ? (
+                    <p className="text-xs text-muted-foreground">Loading documents...</p>
+                ) : !documents || documents.length === 0 ? (
+                    <p className="text-xs text-muted-foreground">No documents uploaded yet.</p>
+                ) : (
+                    <div className="grid gap-2">
+                        {documents.map((doc: any) => (
+                            <div key={doc.id} className="flex items-center justify-between p-2 border rounded-md text-sm">
+                                <div className="flex items-center gap-2">
+                                    <div className="h-8 w-8 rounded bg-primary/10 flex items-center justify-center text-primary">
+                                        <FileText className="h-4 w-4" />
+                                    </div>
+                                    <div className="flex flex-col">
+                                        <span className="font-medium line-clamp-1">{doc.fileName}</span>
+                                        <span className="text-[10px] text-muted-foreground">{doc.requirement?.label || "General Document"}</span>
+                                    </div>
+                                </div>
+                                <Button variant="ghost" size="icon" render={<a href={doc.fileUrl} target="_blank" rel="noopener noreferrer" />}>
+                                    <Download className="h-4 w-4" />
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </div>
+
+            <div className="pt-4 border-t space-y-2">
+                <Button className="w-full" render={<Link href={`/officer/review/${application.id}`} />}>
+                    Full Review View
+                </Button>
+            </div>
+        </div>
+    );
+}
 
 export default function OfficerApplicationsPage() {
     const { data: session, status } = useSession();
@@ -104,35 +196,71 @@ export default function OfficerApplicationsPage() {
                             <p className="text-muted-foreground">No applications found</p>
                         </div>
                     ) : (
-                        <div className="space-y-3">
-                            {applications.map((app: any) => (
-                                <Card key={app.id} className="hover:bg-muted/50 transition-colors">
-                                    <CardContent className="p-4">
-                                        <div className="flex items-start justify-between gap-4">
-                                            <div className="flex-1 space-y-1">
-                                                <div className="flex items-center gap-2">
-                                                    <h3 className="font-medium">{app.permitType}</h3>
-                                                    <Badge className={getStatusColor(app.status)}>
-                                                        {getStatusLabel(app.status)}
-                                                    </Badge>
+                        <div className="border rounded-md">
+                            <Table>
+                                <TableHeader>
+                                    <TableRow>
+                                        <TableHead>Type & Description</TableHead>
+                                        <TableHead>Applicant</TableHead>
+                                        <TableHead>Submitted</TableHead>
+                                        <TableHead>Status</TableHead>
+                                        <TableHead className="text-right">Actions</TableHead>
+                                    </TableRow>
+                                </TableHeader>
+                                <TableBody>
+                                    {applications.map((app: any) => (
+                                        <TableRow key={app.id}>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="font-medium">{app.permitType}</span>
+                                                    <span className="text-xs text-muted-foreground line-clamp-1 max-w-[250px]">
+                                                        {app.description}
+                                                    </span>
                                                 </div>
-                                                <p className="text-sm text-muted-foreground line-clamp-2">{app.description}</p>
-                                                <div className="flex items-center gap-4 text-xs text-muted-foreground">
-                                                    <span>📍 {app.location}</span>
-                                                    <span>👤 {app.applicant.email}</span>
-                                                    <span>📅 {formatDateTime(app.createdAt)}</span>
+                                            </TableCell>
+                                            <TableCell>
+                                                <div className="flex flex-col">
+                                                    <span className="text-sm font-medium">{app.applicant.name}</span>
+                                                    <span className="text-[10px] text-muted-foreground">{app.applicant.email}</span>
                                                 </div>
-                                            </div>
-                                            <Button size="sm" asChild>
-                                                <Link href={`/officer/review/${app.id}`}>
-                                                    <Eye className="h-4 w-4 mr-2" />
-                                                    Review
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ))}
+                                            </TableCell>
+                                            <TableCell className="text-xs">
+                                                {formatDateTime(app.createdAt)}
+                                            </TableCell>
+                                            <TableCell>
+                                                <Badge className={getStatusColor(app.status)}>
+                                                    {getStatusLabel(app.status)}
+                                                </Badge>
+                                            </TableCell>
+                                            <TableCell className="text-right">
+                                                <div className="flex justify-end gap-2">
+                                                    <Sheet>
+                                                        <SheetTrigger
+                                                            render={
+                                                                <Button size="sm" variant="ghost">
+                                                                    <Eye className="h-4 w-4" />
+                                                                </Button>
+                                                            }
+                                                        />
+                                                        <SheetContent className="w-[400px] sm:w-[540px]">
+                                                            <SheetHeader>
+                                                                <SheetTitle>{app.permitType}</SheetTitle>
+                                                                <SheetDescription>
+                                                                    Review Application Details & Documents
+                                                                </SheetDescription>
+                                                            </SheetHeader>
+                                                            <ApplicationDetails id={app.id} />
+                                                        </SheetContent>
+                                                    </Sheet>
+                                                    <Button size="sm" render={<Link href={`/officer/review/${app.id}`} />}>
+                                                        Review
+                                                    </Button>
+                                                </div>
+                                            </TableCell>
+                                        </TableRow>
+                                    ))}
+                                </TableBody>
+                            </Table>
                         </div>
                     )}
 

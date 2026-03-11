@@ -59,8 +59,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
         return (
             <div className="container mx-auto py-8 max-w-5xl">
                 <p className="text-destructive">Failed to load application</p>
-                <Button variant="outline" className="mt-4" asChild>
-                    <Link href="/applications">Back to Applications</Link>
+                <Button variant="outline" className="mt-4" render={<Link href="/applications" />}>
+                    Back to Applications
                 </Button>
             </div>
         );
@@ -114,10 +114,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
     return (
         <div className="container mx-auto py-8 max-w-5xl space-y-8">
             <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" asChild>
-                    <Link href="/applications">
-                        <ArrowLeft className="h-4 w-4" />
-                    </Link>
+                <Button variant="ghost" size="icon" render={<Link href="/applications" />} className="rounded-full h-10 w-10">
+                    <ArrowLeft className="h-5 w-5 text-muted-foreground" />
                 </Button>
                 <div>
                     <h1 className="text-2xl font-bold">Application Details</h1>
@@ -161,11 +159,9 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                         <CardHeader>
                             <CardTitle>Documents</CardTitle>
                             {isOwner && application.status !== "APPROVED" && application.status !== "REJECTED" && (
-                                <Button size="sm" asChild>
-                                    <Link href={`/applications/${application.id}/edit`}>
-                                        <Plus className="h-4 w-4 mr-1" />
-                                        Add Document
-                                    </Link>
+                                <Button size="sm" render={<Link href={`/applications/${application.id}/edit`} />}>
+                                    <Plus className="h-4 w-4 mr-1" />
+                                    Add Document
                                 </Button>
                             )}
                         </CardHeader>
@@ -274,10 +270,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                                 <CardTitle>Officer Actions</CardTitle>
                             </CardHeader>
                             <CardContent className="space-y-2">
-                                <Button className="w-full" variant="outline" asChild>
-                                    <Link href={`/officer/review/${application.id}`}>
-                                        Review Application
-                                    </Link>
+                                <Button className="w-full" variant="outline" render={<Link href={`/officer/review/${application.id}`} />}>
+                                    Review Application
                                 </Button>
                             </CardContent>
                         </Card>

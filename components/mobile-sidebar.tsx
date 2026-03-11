@@ -5,19 +5,19 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
+import { HugeiconsIcon } from "@hugeicons/react";
 import {
-    Home,
-    ClipboardList,
-    PlusCircle,
-    Users,
-    Map,
-    User,
-    LayoutDashboard,
-    Settings,
-    FileText,
-    Menu,
-    X,
-} from "lucide-react";
+    Home01Icon,
+    Note01Icon,
+    AddCircleIcon,
+    UserGroupIcon,
+    Location01Icon,
+    UserIcon,
+    DashboardCircleIcon,
+    File02Icon,
+    Menu01Icon,
+    Cancel01Icon,
+} from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/lib/types";
 
@@ -37,20 +37,20 @@ export function MobileSidebar() {
         {
             title: "Dashboard",
             href: "/dashboard",
-            icon: Home,
+            icon: Home01Icon,
             active: pathname === "/dashboard",
         },
         ...(isApplicant ? [
             {
                 title: "My Applications",
                 href: "/applications",
-                icon: ClipboardList,
+                icon: Note01Icon,
                 active: pathname === "/applications",
             },
             {
                 title: "New Application",
                 href: "/applications/new",
-                icon: PlusCircle,
+                icon: AddCircleIcon,
                 active: pathname === "/applications/new",
             },
         ] : []),
@@ -58,33 +58,33 @@ export function MobileSidebar() {
             {
                 title: "Review Queue",
                 href: "/officer/applications",
-                icon: Users,
+                icon: UserGroupIcon,
                 active: pathname === "/officer/applications",
             },
             {
                 title: "All Applications",
                 href: "/applications",
-                icon: ClipboardList,
+                icon: Note01Icon,
                 active: pathname === "/applications" && !pathname.startsWith("/applications/new"),
             },
         ] : []),
         {
             title: "Permit Map",
             href: "/map",
-            icon: Map,
+            icon: Location01Icon,
             active: pathname === "/map",
         },
         {
             title: "Profile",
             href: "/profile",
-            icon: User,
+            icon: UserIcon,
             active: pathname === "/profile",
         },
         ...(isAdmin ? [
             {
                 title: "Admin Dashboard",
                 href: "/admin",
-                icon: LayoutDashboard,
+                icon: DashboardCircleIcon,
                 active: pathname === "/admin",
             },
         ] : []),
@@ -98,7 +98,7 @@ export function MobileSidebar() {
                 onClick={() => setIsOpen(true)}
                 className="h-10 w-10"
             >
-                <Menu className="h-6 w-6" />
+                <HugeiconsIcon icon={Menu01Icon} className="h-6 w-6" />
                 <span className="sr-only">Open Menu</span>
             </Button>
 
@@ -111,7 +111,7 @@ export function MobileSidebar() {
                                 className="flex items-center space-x-2"
                                 onClick={() => setIsOpen(false)}
                             >
-                                <FileText className="h-6 w-6 text-primary" />
+                                <HugeiconsIcon icon={File02Icon} className="h-6 w-6 text-primary" />
                                 <span className="font-bold text-xl tracking-tight">Council Portal</span>
                             </Link>
                             <Button
@@ -119,7 +119,7 @@ export function MobileSidebar() {
                                 size="icon"
                                 onClick={() => setIsOpen(false)}
                             >
-                                <X className="h-6 w-6" />
+                                <HugeiconsIcon icon={Cancel01Icon} className="h-6 w-6" />
                                 <span className="sr-only">Close Menu</span>
                             </Button>
                         </div>
@@ -134,7 +134,7 @@ export function MobileSidebar() {
                                     )}
                                     onClick={() => setIsOpen(false)}
                                 >
-                                    <item.icon className="mr-2 h-4 w-4" />
+                                    <HugeiconsIcon icon={item.icon} className="mr-2 h-4 w-4" />
                                     <span>{item.title}</span>
                                 </Link>
                             ))}

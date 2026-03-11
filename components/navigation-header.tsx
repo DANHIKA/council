@@ -8,21 +8,22 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuLabel,
+    DropdownMenuHeader,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import { Badge } from "@/components/ui/badge";
+import { HugeiconsIcon } from "@hugeicons/react";
 import { 
-    Circle, 
-    Bell, 
-    ChevronDown, 
-    LogOut, 
-    FileText,
-    Settings,
-    User,
-    Users
-} from "lucide-react";
+    Tick01Icon, 
+    Notification01Icon, 
+    ArrowDown01Icon, 
+    Logout01Icon, 
+    Note01Icon,
+    Settings01Icon,
+    UserIcon,
+    UserGroupIcon
+} from "@hugeicons/core-free-icons";
 import { formatDateTime } from "@/lib/utils";
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from "@/lib/queries";
 import type { UserRole } from "@/lib/types";
@@ -101,7 +102,7 @@ export function NavigationHeader() {
                 <div className="flex items-center space-x-4">
                     <MobileSidebar />
                     <Link href="/dashboard" className="flex items-center space-x-2 md:hidden">
-                        <FileText className="h-6 w-6 text-primary" />
+                        <HugeiconsIcon icon={Note01Icon} className="h-6 w-6 text-primary" />
                     </Link>
                     <div className="hidden md:flex items-center space-x-2">
                         {/* Empty space or breadcrumbs can go here */}
@@ -114,16 +115,18 @@ export function NavigationHeader() {
                     
                     {/* Notifications */}
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" size="icon" className="relative">
-                                    <Bell className="h-5 w-5" />
-                                    {unreadCount > 0 && (
-                                        <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] text-white">
-                                            {unreadCount > 9 ? "9+" : unreadCount}
-                                        </span>
-                                    )}
-                                </Button>
-                            </DropdownMenuTrigger>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button variant="ghost" size="icon" className="relative">
+                                        <HugeiconsIcon icon={Notification01Icon} className="h-5 w-5" />
+                                        {unreadCount > 0 && (
+                                            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] text-white">
+                                                {unreadCount > 9 ? "9+" : unreadCount}
+                                            </span>
+                                        )}
+                                    </Button>
+                                }
+                            />
                             <DropdownMenuContent align="end" className="w-80 p-0">
                                 <div className="p-4 border-b flex items-center justify-between">
                                     <h3 className="font-semibold">Notifications</h3>
@@ -148,23 +151,23 @@ export function NavigationHeader() {
                                             <DropdownMenuItem
                                                 key={n.id}
                                                 className={`p-4 flex flex-col items-start gap-1 cursor-pointer border-b last:border-0 ${!n.read ? "bg-muted/50" : ""}`}
-                                                asChild
+                                                render={
+                                                    <Link
+                                                        href={n.link || "#"}
+                                                        onClick={() => !n.read && markAsRead(n.id)}
+                                                    />
+                                                }
                                             >
-                                                <Link
-                                                    href={n.link || "#"}
-                                                    onClick={() => !n.read && markAsRead(n.id)}
-                                                >
-                                                    <div className="flex items-center justify-between w-full">
-                                                        <span className="font-medium text-sm">{n.title}</span>
-                                                        {!n.read && <Circle className="h-2 w-2 fill-primary text-primary" />}
-                                                    </div>
-                                                    <p className="text-xs text-muted-foreground line-clamp-2">
-                                                        {n.message}
-                                                    </p>
-                                                    <span className="text-[10px] text-muted-foreground mt-1">
-                                                        {formatDateTime(n.createdAt)}
-                                                    </span>
-                                                </Link>
+                                                <div className="flex items-center justify-between w-full">
+                                                    <span className="font-medium text-sm">{n.title}</span>
+                                                    {!n.read && <HugeiconsIcon icon={Tick01Icon} className="h-2 w-2 fill-primary text-primary" />}
+                                                </div>
+                                                <p className="text-xs text-muted-foreground line-clamp-2">
+                                                    {n.message}
+                                                </p>
+                                                <span className="text-[10px] text-muted-foreground mt-1">
+                                                    {formatDateTime(n.createdAt)}
+                                                </span>
                                             </DropdownMenuItem>
                                         ))
                                     )}
@@ -173,43 +176,49 @@ export function NavigationHeader() {
                         </DropdownMenu>
 
                         <DropdownMenu>
-                            <DropdownMenuTrigger asChild>
-                                <Button variant="ghost" className="flex items-center space-x-2 h-auto p-2">
-                                    <Avatar className="h-8 w-8">
-                                        <AvatarFallback className="text-xs">{initials}</AvatarFallback>
-                                    </Avatar>
-                                    <div className="hidden sm:flex flex-col items-start text-left">
-                                        <span className="text-sm font-medium">{userName}</span>
-                                        <Badge variant="secondary" className={`text-[10px] px-1 h-4 ${getRoleBadgeColor(userRole)}`}>
-                                            {getRoleLabel(userRole)}
-                                        </Badge>
-                                    </div>
-                                    <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                                </Button>
-                            </DropdownMenuTrigger>
+                            <DropdownMenuTrigger
+                                render={
+                                    <Button variant="ghost" className="flex items-center space-x-2 h-auto p-2">
+                                        <Avatar className="h-8 w-8">
+                                            <AvatarFallback className="text-xs">{initials}</AvatarFallback>
+                                        </Avatar>
+                                        <div className="hidden sm:flex flex-col items-start text-left">
+                                            <span className="text-sm font-medium">{userName}</span>
+                                            <Badge variant="secondary" className={`text-[10px] px-1 h-4 ${getRoleBadgeColor(userRole)}`}>
+                                                {getRoleLabel(userRole)}
+                                            </Badge>
+                                        </div>
+                                        <HugeiconsIcon icon={ArrowDown01Icon} className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                }
+                            />
                             <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuLabel>
+                                <DropdownMenuHeader>
                                     <div className="flex flex-col space-y-1">
                                         <p className="text-sm font-medium">{userName}</p>
                                         <p className="text-xs text-muted-foreground">{userEmail}</p>
                                     </div>
-                                </DropdownMenuLabel>
+                                </DropdownMenuHeader>
                                 <DropdownMenuSeparator />
 
-                                <DropdownMenuItem asChild>
-                                            <Link href="/profile" className="flex items-center">
-                                                <User className="mr-2 h-4 w-4" />
-                                                Profile
-                                            </Link>
-                                        </DropdownMenuItem>
+                                <DropdownMenuItem
+                                    render={
+                                        <Link href="/profile" className="flex items-center" />
+                                    }
+                                >
+                                    <HugeiconsIcon icon={UserIcon} className="mr-2 h-4 w-4" />
+                                    Profile
+                                </DropdownMenuItem>
 
                                 {userRole === "ADMIN" && (
-                                    <DropdownMenuItem asChild>
-                                            <Link href="/admin" className="flex items-center">
-                                                <Users className="mr-2 h-4 w-4" />
-                                                Admin Dashboard
-                                            </Link>
-                                        </DropdownMenuItem>
+                                    <DropdownMenuItem
+                                        render={
+                                            <Link href="/admin" className="flex items-center" />
+                                        }
+                                    >
+                                        <HugeiconsIcon icon={UserGroupIcon} className="mr-2 h-4 w-4" />
+                                        Admin Dashboard
+                                    </DropdownMenuItem>
                                 )}
 
                                 <DropdownMenuSeparator />
@@ -218,7 +227,7 @@ export function NavigationHeader() {
                                     onClick={handleLogout}
                                     className="text-destructive focus:text-destructive"
                                 >
-                                    <LogOut className="mr-2 h-4 w-4" />
+                                    <HugeiconsIcon icon={Logout01Icon} className="mr-2 h-4 w-4" />
                                     Sign Out
                                 </DropdownMenuItem>
                             </DropdownMenuContent>

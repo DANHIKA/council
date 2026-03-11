@@ -70,7 +70,14 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
     try {
         const session = await auth();
+        console.log("GET /api/applications - session:", {
+            userId: session?.user?.id,
+            email: session?.user?.email,
+            role: (session?.user as any)?.role
+        });
+
         if (!session?.user?.id) {
+            console.log("GET /api/applications - Unauthorized");
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
@@ -78,6 +85,8 @@ export async function GET(req: NextRequest) {
         const page = parseInt(searchParams.get("page") ?? "1", 10);
         const limit = Math.min(parseInt(searchParams.get("limit") ?? "20", 10), 100);
         const status = searchParams.get("status") ?? undefined;
+
+        console.log("GET /api/applications - query params:", { page, limit, status });
 
         const where = {
             applicantId: session.user.id,
@@ -103,8 +112,10 @@ export async function GET(req: NextRequest) {
             prisma.permitApplication.count({ where }),
         ]);
 
+        console.log(`GET /api/applications - found ${applications.length} applications (total: ${total})`);
+
         return NextResponse.json({
-            applications,
+            data: applications,
             pagination: {
                 page,
                 limit,

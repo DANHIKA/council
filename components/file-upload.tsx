@@ -4,7 +4,13 @@ import { useState, useCallback } from "react";
 import { Card, CardContent } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Upload, File, X, Download } from "lucide-react";
+import { HugeiconsIcon } from "@hugeicons/react";
+import { 
+    File02Icon, 
+    Download01Icon, 
+    Cancel01Icon, 
+    Upload01Icon 
+} from "@hugeicons/core-free-icons";
 import type { UploadedDocument } from "@/lib/types/application";
 
 interface UploadedFileProps {
@@ -39,7 +45,7 @@ export function UploadedFile({ file, showStatus = false, onDelete }: UploadedFil
         <Card className="p-4">
             <div className="flex items-center justify-between">
                 <div className="flex items-center space-x-3 flex-1 min-w-0">
-                    <File className="h-8 w-8 text-muted-foreground flex-shrink-0" />
+                    <HugeiconsIcon icon={File02Icon} className="h-8 w-8 text-muted-foreground flex-shrink-0" />
                     <div className="flex-1 min-w-0">
                         <p className="text-sm font-medium truncate">{file.name}</p>
                         <div className="flex items-center space-x-2 text-xs text-muted-foreground">
@@ -55,10 +61,8 @@ export function UploadedFile({ file, showStatus = false, onDelete }: UploadedFil
                             {file.status}
                         </Badge>
                     )}
-                    <Button size="sm" variant="outline" asChild>
-                        <a href={file.fileUrl} target="_blank" rel="noopener noreferrer">
-                            <Download className="h-4 w-4" />
-                        </a>
+                    <Button size="sm" variant="outline" render={<a href={file.fileUrl} target="_blank" rel="noopener noreferrer" />}>
+                        <HugeiconsIcon icon={Download01Icon} className="h-4 w-4" />
                     </Button>
                     {onDelete && (
                         <Button
@@ -67,7 +71,7 @@ export function UploadedFile({ file, showStatus = false, onDelete }: UploadedFil
                             onClick={() => onDelete(file.id)}
                             className="text-destructive hover:text-destructive"
                         >
-                            <X className="h-4 w-4" />
+                            <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
                         </Button>
                     )}
                 </div>
@@ -144,30 +148,22 @@ export function FileUpload({ onUpload, accept = "*", multiple = false, maxSize =
             onDrop={handleDrop}
         >
             <CardContent className="p-8">
-                <div className="flex flex-col items-center justify-center space-y-4 text-center">
-                    <Upload className="h-12 w-12 text-muted-foreground" />
-                    <div>
-                        <p className="text-lg font-medium">
-                            {isUploading ? 'Uploading...' : 'Drop files here or click to browse'}
-                        </p>
-                        <p className="text-sm text-muted-foreground">
-                            {accept !== "*" && `Accepted formats: ${accept}`}
-                            <br />
-                            Maximum file size: {maxSize / 1024 / 1024}MB
-                        </p>
+                <div className="flex flex-col items-center gap-2">
+                    <HugeiconsIcon icon={Upload01Icon} className="h-8 w-8 text-muted-foreground" />
+                    <div className="text-center">
+                        <p className="text-sm font-medium">Click to upload or drag and drop</p>
+                        <p className="text-xs text-muted-foreground">Max size: 10MB</p>
                     </div>
-                    <Button variant="outline" disabled={disabled || isUploading} asChild>
-                        <label className="cursor-pointer">
-                            <input
-                                type="file"
-                                className="sr-only"
-                                accept={accept}
-                                multiple={multiple}
-                                onChange={handleFileInput}
-                                disabled={disabled || isUploading}
-                            />
-                            Choose Files
-                        </label>
+                    <Button variant="outline" disabled={disabled || isUploading} render={<label />}>
+                        Select File
+                        <input
+                            type="file"
+                            className="hidden"
+                            accept={accept}
+                            multiple={multiple}
+                            onChange={(e) => e.target.files && onUpload(Array.from(e.target.files))}
+                            disabled={disabled || isUploading}
+                        />
                     </Button>
                 </div>
             </CardContent>
