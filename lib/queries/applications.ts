@@ -97,3 +97,16 @@ export const useDownloadCertificate = (applicationId: string) => {
         mutationFn: () => applicationsApi.certificate.download(applicationId),
     });
 };
+
+export const useResubmitApplication = () => {
+    const queryClient = useQueryClient();
+    return useMutation({
+        mutationFn: (id: string) => applicationsApi.resubmit(id),
+        onSuccess: (_, id) => {
+            queryClient.invalidateQueries({ queryKey: queryKeys.application(id) });
+            queryClient.invalidateQueries({ queryKey: queryKeys.applications });
+            queryClient.invalidateQueries({ queryKey: ["officer", "queue"] });
+            queryClient.invalidateQueries({ queryKey: ["officer", "applications", id] });
+        },
+    });
+};

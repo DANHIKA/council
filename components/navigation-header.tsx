@@ -1,6 +1,8 @@
 "use client";
 
+import { useEffect, useState } from "react";
 import { useSession, signOut } from "next-auth/react";
+import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback } from "@/components/ui/avatar";
@@ -8,36 +10,81 @@ import {
     DropdownMenu,
     DropdownMenuContent,
     DropdownMenuItem,
-    DropdownMenuHeader,
+    DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
+import {
+    CommandDialog,
+    CommandInput,
+    CommandList,
+    CommandEmpty,
+    CommandGroup,
+    CommandItem,
+    CommandSeparator,
+    CommandShortcut,
+} from "@/components/ui/command";
 import { Badge } from "@/components/ui/badge";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { 
-    Tick01Icon, 
-    Notification01Icon, 
-    ArrowDown01Icon, 
-    Logout01Icon, 
+import {
+    Tick01Icon,
+    Notification01Icon,
+    ArrowDown01Icon,
+    Logout01Icon,
     Note01Icon,
-    Settings01Icon,
     UserIcon,
     UserGroupIcon
 } from "@hugeicons/core-free-icons";
+import { LayoutDashboard, FileText, PlusCircle, Map, Users, Search } from "lucide-react";
 import { formatDateTime } from "@/lib/utils";
 import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from "@/lib/queries";
 import type { UserRole } from "@/lib/types";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 
+function useCommandPalette(userRole: string, router: ReturnType<typeof useRouter>) {
+    const [open, setOpen] = useState(false);
+
+    useEffect(() => {
+        const handler = (e: KeyboardEvent) => {
+            if ((e.metaKey || e.ctrlKey) && e.key === "k") {
+                e.preventDefault();
+                setOpen((o) => !o);
+            }
+        };
+        document.addEventListener("keydown", handler);
+        return () => document.removeEventListener("keydown", handler);
+    }, []);
+
+    const navigate = (path: string) => {
+        setOpen(false);
+        router.push(path);
+    };
+
+    const isStaff = userRole === "OFFICER" || userRole === "ADMIN";
+
+    return { open, setOpen, navigate, isStaff };
+}
+
 export function NavigationHeader() {
     const { data: session, status } = useSession();
+    const router = useRouter();
     const { data: notificationsData } = useNotifications();
     const markReadMutation = useMarkNotificationRead();
     const markAllReadMutation = useMarkAllNotificationsRead();
+    const [mounted, setMounted] = useState(false);
+
+    useEffect(() => {
+        setMounted(true);
+    }, []);
 
     const notifications = notificationsData?.notifications || [];
     const unreadCount = notificationsData?.unreadCount || 0;
+
+    const userRole = (session?.user as { role: UserRole })?.role ?? "";
+
+    const { open: cmdOpen, setOpen: setCmdOpen, navigate: cmdNavigate, isStaff } =
+        useCommandPalette(userRole, router);
 
     const markAsRead = async (id: string) => {
         try {
@@ -55,7 +102,8 @@ export function NavigationHeader() {
         }
     };
 
-    if (status === "loading") {
+    // Prevent hydration mismatch
+    if (!mounted || status === "loading") {
         return (
             <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60">
                 <div className="container mx-auto px-4 h-16 flex items-center justify-between">
@@ -67,8 +115,6 @@ export function NavigationHeader() {
     }
 
     if (!session) return null;
-
-    const userRole = (session.user as { role: UserRole })?.role;
     const userName = session.user?.name || "User";
     const userEmail = session.user?.email || "";
     const initials = userName.split(" ").map(n => n[0]).join("").toUpperCase().slice(0, 2);
@@ -96,6 +142,7 @@ export function NavigationHeader() {
     };
 
     return (
+        <>
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
             <div className="flex h-16 items-center justify-between px-4 md:px-6">
                 {/* Logo/Brand */}
@@ -111,6 +158,17 @@ export function NavigationHeader() {
 
                 {/* User Menu */}
                 <div className="flex items-center space-x-2">
+                    {/* ⌘K quick-nav trigger */}
+                    <Button
+                        variant="outline"
+                        size="sm"
+                        className="hidden sm:flex h-8 gap-2 text-xs text-muted-foreground border-muted-foreground/20 px-3"
+                        onClick={() => setCmdOpen(true)}
+                    >
+                        <Search className="h-3.5 w-3.5" />
+                        <span>Search</span>
+                        <CommandShortcut>⌘K</CommandShortcut>
+                    </Button>
                     <ThemeToggle />
                     
                     {/* Notifications */}
@@ -193,12 +251,12 @@ export function NavigationHeader() {
                                 }
                             />
                             <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuHeader>
+                                <DropdownMenuLabel>
                                     <div className="flex flex-col space-y-1">
                                         <p className="text-sm font-medium">{userName}</p>
                                         <p className="text-xs text-muted-foreground">{userEmail}</p>
                                     </div>
-                                </DropdownMenuHeader>
+                                </DropdownMenuLabel>
                                 <DropdownMenuSeparator />
 
                                 <DropdownMenuItem
@@ -235,5 +293,68 @@ export function NavigationHeader() {
                     </div>
                 </div>
         </header>
+
+        {/* Global Command Palette */}
+        <CommandDialog open={cmdOpen} onOpenChange={setCmdOpen} title="Quick Navigation">
+            <CommandInput placeholder="Search pages and actions..." />
+            <CommandList>
+                <CommandEmpty>No results found.</CommandEmpty>
+                <CommandGroup heading="Navigation">
+                    <CommandItem onSelect={() => cmdNavigate("/dashboard")}>
+                        <LayoutDashboard className="h-4 w-4" />
+                        Dashboard
+                        <CommandShortcut>⌘D</CommandShortcut>
+                    </CommandItem>
+                    {!isStaff && (
+                        <CommandItem onSelect={() => cmdNavigate("/applications/new")}>
+                            <PlusCircle className="h-4 w-4" />
+                            New Application
+                        </CommandItem>
+                    )}
+                    <CommandItem onSelect={() => cmdNavigate("/applications")}>
+                        <FileText className="h-4 w-4" />
+                        {isStaff ? "All Applications" : "My Applications"}
+                    </CommandItem>
+                    <CommandItem onSelect={() => cmdNavigate("/map")}>
+                        <Map className="h-4 w-4" />
+                        Permit Map
+                    </CommandItem>
+                </CommandGroup>
+                {isStaff && (
+                    <>
+                        <CommandSeparator />
+                        <CommandGroup heading="Officer">
+                            <CommandItem onSelect={() => cmdNavigate("/officer/applications")}>
+                                <FileText className="h-4 w-4" />
+                                Review Queue
+                            </CommandItem>
+                        </CommandGroup>
+                    </>
+                )}
+                {userRole === "ADMIN" && (
+                    <>
+                        <CommandSeparator />
+                        <CommandGroup heading="Admin">
+                            <CommandItem onSelect={() => cmdNavigate("/admin")}>
+                                <Users className="h-4 w-4" />
+                                Admin Dashboard
+                            </CommandItem>
+                        </CommandGroup>
+                    </>
+                )}
+                <CommandSeparator />
+                <CommandGroup heading="Account">
+                    <CommandItem onSelect={() => cmdNavigate("/profile")}>
+                        <HugeiconsIcon icon={UserIcon} className="h-4 w-4" />
+                        Profile
+                    </CommandItem>
+                    <CommandItem onSelect={() => signOut({ callbackUrl: "/auth/login" })} className="text-destructive data-selected:text-destructive">
+                        <HugeiconsIcon icon={Logout01Icon} className="h-4 w-4" />
+                        Sign Out
+                    </CommandItem>
+                </CommandGroup>
+            </CommandList>
+        </CommandDialog>
+        </>
     );
 }

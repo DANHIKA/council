@@ -29,6 +29,8 @@ export const applicationsApi = {
 
     submit: (id: string) => http.post(`/api/applications/${id}/submit`),
 
+    resubmit: (id: string) => http.post(`/api/applications/${id}/resubmit`),
+
     documents: {
         list: (applicationId: string) =>
             http.get<{ documents: UploadedDocument[] }>(`/api/applications/${applicationId}/documents`),

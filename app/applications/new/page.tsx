@@ -82,6 +82,7 @@ export default function NewApplicationPage() {
         try {
             const res = await fetch("/api/ai/recommend-permit", {
                 method: "POST",
+                headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ description: descriptionValue }),
             });
             const data = await res.json();

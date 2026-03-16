@@ -1,6 +1,7 @@
 "use client";
 
 import * as React from "react";
+import { useState, useEffect } from "react";
 import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useSession } from "next-auth/react";
@@ -22,11 +23,17 @@ import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/lib/types";
 
 export function MobileSidebar() {
-    const [isOpen, setIsOpen] = React.useState(false);
+    const [isOpen, setIsOpen] = useState(false);
     const pathname = usePathname();
-    const { data: session } = useSession();
+    const { data: session, status } = useSession();
+    const [mounted, setMounted] = useState(false);
 
-    if (!session) return null;
+    useEffect(() => {
+        setMounted(true);
+    }, []);
+
+    // Prevent hydration mismatch
+    if (!mounted || status === "loading" || !session) return null;
 
     const userRole = (session.user as { role: UserRole })?.role;
     const isApplicant = userRole === "APPLICANT";

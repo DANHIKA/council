@@ -179,9 +179,11 @@ export default function PermitMapPage() {
                                                 </p>
                                             </div>
                                             <div className="flex items-center gap-2">
-                                                <Button size="sm" variant="outline" render={<Link href={`/applications/${app.id}`} />}>
-                                                    View
-                                                </Button>
+                                                <Link href={`/applications/${app.id}`}>
+                                                    <Button size="sm" variant="outline">
+                                                        View
+                                                    </Button>
+                                                </Link>
                                             </div>
                                         </div>
                                     </div>

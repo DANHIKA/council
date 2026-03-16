@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateOllamaContent, compactContext } from "@/lib/ollama";
-
+import { generateOllamaContent } from "@/lib/ollama";
 import { getRelevantScenarios } from "@/lib/ai-scenarios";
 
 export async function POST(req: NextRequest) {
@@ -18,75 +17,65 @@ export async function POST(req: NextRequest) {
 
         const relevantScenarios = getRelevantScenarios(description);
         const scenarioText = relevantScenarios
-            .map(s => `User: "${s.query}"\nResponse: {"recommendation": "${s.recommendation}", "explanation": "${s.explanation}"}`)
+            .map(s => `User described: "${s.query}"\nCorrect permit: {"recommendation": "${s.recommendation}", "explanation": "${s.explanation}"}`)
             .join("\n\n");
 
-        // Compact the permit list to save tokens and avoid confusing the model
-        const compactPermitList = compactContext(permitTypes, (pt) => `${pt.name} (${pt.description})`);
+        const permitList = permitTypes.map(pt => `- ${pt.name}: ${pt.description}`).join("\n");
 
-        const prompt = `### Instruction ###
-You are a Council Permit Expert. Based on the User Query, select the MOST relevant permit from the list below.
-You MUST respond with ONLY a valid JSON object.
+        // Simplified prompt for smaller models
+        const prompt = `Permit types: ${permitList}
 
-### Available Permits ###
-${compactPermitList}
-
-### Examples ###
+Examples:
 ${scenarioText}
 
-### Current Task ###
-User: "${description}"
-Response:`;
+User wants: "${description}"
+
+What permit is needed? Reply with just the permit name.`;
 
         const responseText = await generateOllamaContent(prompt);
-        console.log("Ollama Raw Response:", responseText);
-        
-        try {
-            // Find the JSON block more aggressively
-            const match = responseText.match(/\{[\s\S]*\}/);
-            if (match) {
-                const recommendation = JSON.parse(match[0]);
-                // Validate that the recommendation actually exists in our list
-                const exists = permitTypes.some(pt => 
-                    pt.name.toLowerCase() === recommendation.recommendation.toLowerCase()
-                );
-                
-                if (exists) {
-                    return NextResponse.json(recommendation);
-                }
-            }
+        console.log("Ollama recommend response:", responseText);
 
-            // Fallback: Heuristic search if JSON fails or model hallucinates a name
+        try {
+            // Try to find a matching permit type in the response
             const normalizedResponse = responseText.toLowerCase();
-            const foundPermit = permitTypes.find(pt => 
+            const foundPermit = permitTypes.find(pt =>
                 normalizedResponse.includes(pt.name.toLowerCase())
             );
 
             if (foundPermit) {
                 return NextResponse.json({
                     recommendation: foundPermit.name,
-                    explanation: "Found a matching permit in the response text."
+                    explanation: "Recommended based on your project description."
                 });
             }
 
-            throw new Error("No JSON or matching permit name found");
+            // Fallback: check if any permit name appears in the response
+            for (const pt of permitTypes) {
+                if (normalizedResponse.includes(pt.name.toLowerCase())) {
+                    return NextResponse.json({
+                        recommendation: pt.name,
+                        explanation: "Matched based on your project description."
+                    });
+                }
+            }
+
+            throw new Error("No matching permit found in AI response");
         } catch (parseError) {
             console.error("Failed to parse AI response:", responseText, parseError);
-            return NextResponse.json({ 
-                recommendation: "Manual Selection Required", 
-                explanation: "AI provided a detailed answer but failed to format it. Please choose from the list above." 
+            return NextResponse.json({
+                recommendation: "Manual Selection Required",
+                explanation: "Could not automatically determine the permit type. Please select one from the list above."
             });
         }
     } catch (error: any) {
         console.error("Permit recommendation error:", error);
-        
-        // Handle specific API quota errors
-        const isQuotaError = error?.status === 429 || error?.message?.includes("429") || error?.message?.includes("quota");
-        if (isQuotaError) {
-            return NextResponse.json({ 
-                recommendation: "AI is currently busy", 
-                explanation: "The AI service is experiencing high traffic. Please wait a few seconds and try again, or select a permit type manually from the list above." 
-            }, { status: 429 });
+
+        const isServiceError = error?.message?.includes("Ollama") || error?.message?.includes("connection");
+        if (isServiceError) {
+            return NextResponse.json({
+                recommendation: "AI Unavailable",
+                explanation: "The AI service is temporarily unavailable. Please wait a moment and try again, or select a permit type manually."
+            }, { status: 503 });
         }
 
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

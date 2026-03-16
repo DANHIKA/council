@@ -15,14 +15,6 @@ export const useApplications = (params?: {
     });
 };
 
-export const useApplication = (id: string) => {
-    return useQuery({
-        queryKey: ["applications", id],
-        queryFn: () => applicationsApi.get(id).then(res => res.application),
-        enabled: !!id,
-    });
-};
-
 export const useCreateApplication = () => {
     const queryClient = useQueryClient();
     return useMutation({

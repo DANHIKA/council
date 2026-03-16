@@ -29,38 +29,39 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Application not found" }, { status: 404 });
         }
 
-        const prompt = `### INSTRUCTION ###
-You are a Senior Council Planning Officer. Summarize the following permit application into a professional Briefing Note.
-Focus on the CORE INTENT, the SCALE of the project, and any POTENTIAL CONCERNS.
+        const docList = application.documents.length > 0
+            ? application.documents.map(d => `- ${d.name} (${d.fileType})`).join("\n")
+            : "No documents uploaded.";
 
-### APPLICATION DATA ###
+        // Simplified prompt for smaller models
+        const prompt = `Write a brief summary of this permit application.
+
 Applicant: ${application.applicant.name}
 Permit Type: ${application.permitTypeRef?.name || application.permitType}
-Project Description: "${application.description}"
+Project: ${application.description}
 Location: ${application.location}
-Attached Documents: ${application.documents.length} files
+Documents: ${application.documents.length} files submitted
 
-### BRIEFING NOTE FORMAT ###
-- **Project Scope:** (1 sentence on what they want to do)
-- **Key Details:** (Location and scale)
-- **Document Status:** (Assessment of the ${application.documents.length} files provided)
-- **Officer Initial Assessment:** (Is this a standard or complex request?)
+Provide a 4-line summary with:
+1. What the applicant wants to do
+2. Where it's located
+3. What documents were provided
+4. Any initial observations
 
-Briefing Note:`;
+Summary:`;
 
         const summary = await generateOllamaContent(prompt);
 
         return NextResponse.json({ summary });
     } catch (error: any) {
         console.error("Auto-summary error:", error);
-        
-        // Handle specific API quota errors
-        const isQuotaError = error?.status === 429 || error?.message?.includes("429") || error?.message?.includes("quota");
-        if (isQuotaError) {
-            return NextResponse.json({ 
-                error: "AI is currently busy", 
-                summary: "AI summary is temporarily unavailable due to high demand. Please try again in a few seconds." 
-            }, { status: 429 });
+
+        const isServiceError = error?.message?.includes("Ollama") || error?.message?.includes("connection");
+        if (isServiceError) {
+            return NextResponse.json({
+                error: "AI is currently unavailable",
+                summary: "AI summary is temporarily unavailable. Please try again in a moment."
+            }, { status: 503 });
         }
 
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

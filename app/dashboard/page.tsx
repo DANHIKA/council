@@ -1,6 +1,7 @@
 "use client";
 
 import { useSession } from "next-auth/react";
+import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -123,6 +124,7 @@ export default function DashboardPage() {
     }, {} as Record<string, number>);
 
     if (status === "loading") return null;
+
     if (!session) {
         router.push("/auth/login");
         return null;
@@ -330,31 +332,31 @@ export default function DashboardPage() {
 
             {/* Alerts for corrections needed */}
             {applications.some(app => app.status === "REQUIRES_CORRECTION") && (
-                <Card className="border-orange-200 bg-orange-50">
+                <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
                     <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-orange-800">
+                        <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
                             <AlertCircle className="h-5 w-5" />
                             Action Required
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <p className="text-orange-700 mb-4">
-                            You have applications that require corrections. Please review and update them.
+                        <p className="text-orange-700 dark:text-orange-400 mb-4">
+                            You have applications that require corrections. Please review and resubmit them.
                         </p>
                         <div className="space-y-2">
                             {applications
                                 .filter(app => app.status === "REQUIRES_CORRECTION")
                                 .slice(0, 3)
                                 .map(app => (
-                                    <div key={app.id} className="flex items-center justify-between p-2 bg-white rounded border">
+                                    <div key={app.id} className="flex items-center justify-between p-2 bg-white dark:bg-background rounded border">
                                         <div>
                                             <p className="font-medium">{app.permitType}</p>
                                             <p className="text-sm text-muted-foreground">
                                                 {formatDateTime(app.updatedAt)}
                                             </p>
                                         </div>
-                                        <Button size="sm" render={<Link href={`/applications/${app.id}`} />}>
-                                            Review
+                                        <Button size="sm" render={<Link href={`/applications/${app.id}/edit`} />}>
+                                            Fix &amp; Resubmit
                                         </Button>
                                     </div>
                                 ))}

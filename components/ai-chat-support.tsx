@@ -1,190 +1,328 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
-import { Card, CardHeader, CardTitle, CardFooter } from "@/components/ui/card";
-import { Input } from "@/components/ui/input";
-import { 
-    Conversation, 
-    ConversationContent, 
+import {
+    Sheet,
+    SheetContent,
+    SheetHeader,
+    SheetTitle,
+} from "@/components/ui/sheet";
+import {
+    Conversation,
+    ConversationContent,
     ConversationScrollButton,
-    ConversationEmptyState
+    ConversationEmptyState,
 } from "@/components/ui/conversation";
+import { Message, MessageContent } from "@/components/ui/message";
+import { Response } from "@/components/ui/response";
+import { ShimmeringText } from "@/components/ui/shimmering-text";
+import {
+    InputGroup,
+    InputGroupInput,
+    InputGroupButton,
+    InputGroupAddon,
+} from "@/components/ui/input-group";
+import { BarVisualizer, type AgentState } from "@/components/ui/bar-visualizer";
 import { HugeiconsIcon } from "@hugeicons/react";
-import { 
-    Chat01Icon, 
-    Cancel01Icon, 
-    SentIcon, 
-    SparklesIcon, 
-    Loading03Icon, 
-    MinusSignIcon 
+import {
+    Chat01Icon,
+    SentIcon,
+    SparklesIcon,
 } from "@hugeicons/core-free-icons";
+import { Mic, MicOff } from "lucide-react";
 import { useSession } from "next-auth/react";
 import { cn } from "@/lib/utils";
 
-interface Message {
+interface ChatMessage {
     role: "user" | "assistant";
     content: string;
+    status: "complete" | "thinking";
+}
+
+function useMicInput(onTranscript: (t: string) => void) {
+    const [isListening, setIsListening] = useState(false);
+    const recognitionRef = useRef<any>(null);
+
+    useEffect(() => {
+        if (typeof window === "undefined") return;
+        const SR =
+            (window as any).SpeechRecognition ||
+            (window as any).webkitSpeechRecognition;
+        if (!SR) return;
+        const r = new SR();
+        r.continuous = false;
+        r.interimResults = false;
+        r.lang = "en-US";
+        r.onresult = (e: any) => {
+            const text = e.results[0]?.[0]?.transcript || "";
+            if (text) onTranscript(text);
+        };
+        r.onerror = () => setIsListening(false);
+        r.onend = () => setIsListening(false);
+        recognitionRef.current = r;
+    }, [onTranscript]);
+
+    const toggle = useCallback(() => {
+        const r = recognitionRef.current;
+        if (!r) return;
+        if (isListening) {
+            r.stop();
+            setIsListening(false);
+        } else {
+            try {
+                r.start();
+                setIsListening(true);
+            } catch {
+                setIsListening(false);
+            }
+        }
+    }, [isListening]);
+
+    const supported =
+        typeof window !== "undefined" &&
+        !!(
+            (window as any).SpeechRecognition ||
+            (window as any).webkitSpeechRecognition
+        );
+
+    return { isListening, toggle, supported };
 }
 
 export function AIChatSupport() {
     const { data: session } = useSession();
-    const [isOpen, setIsOpen] = useState(false);
-    const [isMinimized, setIsMinimized] = useState(false);
-    const [messages, setMessages] = useState<Message[]>([
-        { role: "assistant", content: "Hello! I'm your Council Assistant. How can I help you with your permit application today?" }
-    ]);
-    const [input, setInput] = useState("");
-    const [isLoading, setIsLoading] = useState(false);
 
-    // Only show to APPLICANTS (citizens) or guests
+    // ── All hooks called unconditionally ─────────────────────────────────
+    const [isOpen, setIsOpen] = useState(false);
+    const [messages, setMessages] = useState<ChatMessage[]>([]);
+    const [input, setInput] = useState("");
+    const [chatStatus, setChatStatus] = useState<
+        "idle" | "sending" | "thinking" | "responding"
+    >("idle");
+
+    const mic = useMicInput(
+        useCallback(
+            (t: string) => setInput((prev) => (prev ? `${prev} ${t}` : t)),
+            []
+        )
+    );
+    // ─────────────────────────────────────────────────────────────────────
+
     const userRole = (session?.user as any)?.role;
     if (userRole === "OFFICER" || userRole === "ADMIN") return null;
 
-    const handleSend = async () => {
-        if (!input.trim() || isLoading) return;
+    const agentState: AgentState =
+        chatStatus === "thinking"
+            ? "thinking"
+            : chatStatus === "responding"
+            ? "speaking"
+            : chatStatus === "sending"
+            ? "connecting"
+            : "listening";
 
-        const userMessage: Message = { role: "user", content: input };
-        setMessages(prev => [...prev, userMessage]);
+    const handleSend = async () => {
+        if (!input.trim() || chatStatus !== "idle") return;
+
+        const text = input.trim();
         setInput("");
-        setIsLoading(true);
+        setMessages((prev) => [
+            ...prev,
+            { role: "user", content: text, status: "complete" },
+        ]);
+        setChatStatus("sending");
+
+        const history = messages
+            .filter((m) => m.status === "complete")
+            .map((m) => ({ role: m.role, content: m.content }));
+        history.push({ role: "user", content: text });
+
+        await new Promise((r) => setTimeout(r, 250));
+        setChatStatus("thinking");
+        setMessages((prev) => [
+            ...prev,
+            { role: "assistant", content: "", status: "thinking" },
+        ]);
 
         try {
-            const chatHistory = messages.map(m => ({
-                role: m.role,
-                content: m.content
-            }));
-            chatHistory.push(userMessage);
-
             const res = await fetch("/api/ai/chat", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ messages: chatHistory }),
+                body: JSON.stringify({ messages: history }),
             });
-            
             const data = await res.json();
             if (data.error) throw new Error(data.error);
 
-            setMessages(prev => [...prev, { role: "assistant", content: data.response }]);
-        } catch (err) {
-            console.error("AI Chat failed:", err);
-            setMessages(prev => [...prev, { role: "assistant", content: "Sorry, I'm having trouble connecting right now. Please try again later." }]);
-        } finally {
-            setIsLoading(false);
+            setMessages((prev) => [
+                ...prev.filter((m) => m.status !== "thinking"),
+                { role: "assistant", content: data.response, status: "complete" },
+            ]);
+            setChatStatus("idle");
+        } catch {
+            setMessages((prev) => [
+                ...prev.filter((m) => m.status !== "thinking"),
+                {
+                    role: "assistant",
+                    content:
+                        "Sorry, I'm having trouble connecting right now. Please try again.",
+                    status: "complete",
+                },
+            ]);
+            setChatStatus("idle");
         }
     };
 
-    if (!isOpen) {
-        return (
-            <div className="fixed bottom-6 right-6 z-50">
-                <Button 
-                    onClick={() => setIsOpen(true)} 
-                    size="icon" 
-                    className="h-14 w-14 rounded-full shadow-lg hover:scale-110 transition-transform bg-primary text-primary-foreground"
-                >
-                    <HugeiconsIcon icon={Chat01Icon} className="h-6 w-6" />
-                </Button>
-            </div>
-        );
-    }
-
     return (
-        <div className={cn(
-            "fixed bottom-6 right-6 z-50 w-80 sm:w-96 transition-all duration-300 ease-in-out",
-            isMinimized ? "h-14" : "h-[500px]"
-        )}>
-            <Card className="h-full flex flex-col shadow-2xl border-primary/20 overflow-hidden bg-background">
-                <CardHeader className="p-4 bg-primary text-primary-foreground flex flex-row items-center justify-between space-y-0 shrink-0">
-                    <CardTitle className="text-sm font-bold flex items-center gap-2">
-                        <HugeiconsIcon icon={SparklesIcon} className="h-4 w-4" />
-                        Council Assistant
-                    </CardTitle>
-                    <div className="flex items-center gap-1">
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10"
-                            onClick={() => setIsMinimized(!isMinimized)}
-                        >
-                            <HugeiconsIcon icon={MinusSignIcon} className="h-4 w-4" />
-                        </Button>
-                        <Button 
-                            variant="ghost" 
-                            size="icon" 
-                            className="h-8 w-8 text-primary-foreground hover:bg-primary-foreground/10"
-                            onClick={() => setIsOpen(false)}
-                        >
-                            <HugeiconsIcon icon={Cancel01Icon} className="h-4 w-4" />
-                        </Button>
-                    </div>
-                </CardHeader>
-                
-                {!isMinimized && (
-                    <>
-                        <Conversation className="bg-muted/30">
-                            <ConversationContent className="space-y-4">
+        <>
+            {/* Floating button to trigger drawer */}
+            <div className="fixed bottom-6 right-6 z-50">
+                <Sheet open={isOpen} onOpenChange={setIsOpen}>
+                    <Button
+                        size="icon"
+                        className="h-14 w-14 rounded-full shadow-xl hover:scale-110 transition-transform bg-primary text-primary-foreground"
+                        onClick={() => setIsOpen(true)}
+                    >
+                        <HugeiconsIcon icon={Chat01Icon} className="h-6 w-6" />
+                    </Button>
+                    <SheetContent side="right" className="w-full sm:w-[400px] p-0 flex flex-col">
+                        <SheetHeader className="p-4 bg-primary text-primary-foreground flex flex-row items-center justify-between space-y-0 shrink-0">
+                            <div className="flex items-center gap-2 flex-1 min-w-0">
+                                <HugeiconsIcon icon={SparklesIcon} className="h-5 w-5 shrink-0" />
+                                <SheetTitle className="text-sm font-bold text-primary-foreground m-0">
+                                    Council Assistant
+                                </SheetTitle>
+                                {chatStatus !== "idle" && (
+                                    <BarVisualizer
+                                        state={agentState}
+                                        demo
+                                        barCount={7}
+                                        minHeight={20}
+                                        maxHeight={80}
+                                        centerAlign
+                                        className="!h-5 !w-10 !bg-transparent !p-0 !rounded-none shrink-0"
+                                    />
+                                )}
+                            </div>
+                        </SheetHeader>
+
+                        {/* Messages */}
+                        <Conversation className="bg-muted/20 flex-1 overflow-hidden">
+                            <ConversationContent className="py-2 px-0">
                                 {messages.length === 0 ? (
-                                    <ConversationEmptyState 
-                                        icon={<SparklesIcon className="h-8 w-8 opacity-20" />}
+                                    <ConversationEmptyState
+                                        icon={
+                                            <HugeiconsIcon
+                                                icon={SparklesIcon}
+                                                className="h-10 w-10 opacity-20"
+                                            />
+                                        }
                                         title="Council Assistant"
                                         description="Ask me anything about your permit application."
                                     />
                                 ) : (
-                                    messages.map((m, i) => (
-                                        <div 
-                                            key={i} 
-                                            className={cn(
-                                                "flex",
-                                                m.role === "user" ? "justify-end" : "justify-start"
-                                            )}
-                                        >
-                                            <div className={cn(
-                                                "max-w-[85%] p-3 rounded-2xl text-sm shadow-sm",
-                                                m.role === "user" 
-                                                    ? "bg-primary text-primary-foreground rounded-tr-none" 
-                                                    : "bg-background border border-primary/10 rounded-tl-none"
-                                            )}>
-                                                {m.content}
-                                            </div>
-                                        </div>
-                                    ))
-                                )}
-                                {isLoading && (
-                                    <div className="flex justify-start">
-                                        <div className="bg-background border border-primary/10 p-3 rounded-2xl rounded-tl-none shadow-sm">
-                                            <HugeiconsIcon icon={Loading03Icon} className="h-4 w-4 animate-spin text-primary" />
-                                        </div>
-                                    </div>
+                                    messages.map((m, i) =>
+                                        m.status === "thinking" ? (
+                                            <Message key={i} from="assistant" className="px-3 py-1">
+                                                <MessageContent variant="flat" className="py-1.5">
+                                                    <ShimmeringText
+                                                        text="Thinking..."
+                                                        duration={1.5}
+                                                        startOnView={false}
+                                                        className="text-sm"
+                                                    />
+                                                </MessageContent>
+                                            </Message>
+                                        ) : (
+                                            <Message key={i} from={m.role} className="px-3 py-1">
+                                                <MessageContent
+                                                    variant={
+                                                        m.role === "assistant" ? "flat" : "contained"
+                                                    }
+                                                    className={
+                                                        m.role === "assistant"
+                                                            ? "text-sm prose prose-sm dark:prose-invert max-w-none"
+                                                            : "text-sm"
+                                                    }
+                                                >
+                                                    {m.role === "assistant" ? (
+                                                        <Response>{m.content}</Response>
+                                                    ) : (
+                                                        m.content
+                                                    )}
+                                                </MessageContent>
+                                            </Message>
+                                        )
+                                    )
                                 )}
                             </ConversationContent>
                             <ConversationScrollButton />
                         </Conversation>
-                        <CardFooter className="p-4 bg-background border-t shrink-0">
-                            <form 
-                                onSubmit={(e) => { e.preventDefault(); handleSend(); }}
-                                className="flex w-full items-center gap-2"
+
+                        {/* Input */}
+                        <div className="p-3 bg-background border-t shrink-0">
+                            <form
+                                onSubmit={(e) => {
+                                    e.preventDefault();
+                                    handleSend();
+                                }}
                             >
-                                <Input 
-                                    placeholder="Ask a question..." 
-                                    value={input}
-                                    onChange={(e) => setInput(e.target.value)}
-                                    disabled={isLoading}
-                                    className="flex-1 rounded-full bg-muted/50 focus:bg-background transition-all"
-                                />
-                                <Button 
-                                    type="submit" 
-                                    size="icon" 
-                                    disabled={isLoading || !input.trim()}
-                                    className="rounded-full shrink-0 shadow-md active:scale-95 transition-transform"
-                                >
-                                    <HugeiconsIcon icon={SentIcon} className="h-4 w-4" />
-                                </Button>
+                                <InputGroup>
+                                    {mic.supported && (
+                                        <InputGroupAddon align="inline-start">
+                                            <InputGroupButton
+                                                size="icon-sm"
+                                                onClick={mic.toggle}
+                                                type="button"
+                                                className={cn(
+                                                    "transition-colors",
+                                                    mic.isListening
+                                                        ? "text-red-500 hover:text-red-600"
+                                                        : "text-muted-foreground hover:text-foreground"
+                                                )}
+                                                title={
+                                                    mic.isListening ? "Stop listening" : "Voice input"
+                                                }
+                                            >
+                                                {mic.isListening ? (
+                                                    <MicOff className="h-3.5 w-3.5" />
+                                                ) : (
+                                                    <Mic className="h-3.5 w-3.5" />
+                                                )}
+                                            </InputGroupButton>
+                                        </InputGroupAddon>
+                                    )}
+                                    <InputGroupInput
+                                        placeholder={
+                                            mic.isListening ? "Listening..." : "Ask a question..."
+                                        }
+                                        value={input}
+                                        onChange={(e) => setInput(e.target.value)}
+                                        disabled={chatStatus !== "idle"}
+                                        onKeyDown={(e) => {
+                                            if (e.key === "Enter" && !e.shiftKey) {
+                                                e.preventDefault();
+                                                handleSend();
+                                            }
+                                        }}
+                                    />
+                                    <InputGroupAddon align="inline-end">
+                                        <InputGroupButton
+                                            type="submit"
+                                            size="icon-sm"
+                                            disabled={chatStatus !== "idle" || !input.trim()}
+                                            className="bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40"
+                                        >
+                                            <HugeiconsIcon
+                                                icon={SentIcon}
+                                                className="h-3.5 w-3.5"
+                                            />
+                                        </InputGroupButton>
+                                    </InputGroupAddon>
+                                </InputGroup>
                             </form>
-                        </CardFooter>
-                    </>
-                )}
-            </Card>
-        </div>
+                        </div>
+                    </SheetContent>
+                </Sheet>
+            </div>
+        </>
     );
 }
-
