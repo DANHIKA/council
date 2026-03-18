@@ -12,6 +12,8 @@ import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { ArrowLeft, Download, FileText, MessageSquare, Plus, Trash2 } from "lucide-react";
 import Link from "next/link";
 import { useApplication, useApplicationDocuments, useDeleteDocument, useCreateComment, useDownloadCertificate } from "@/lib/queries";
+import { usePermissions } from "@/hooks/usePermissions";
+import { StaffOnly } from "@/components/permission-guard";
 import { toast } from "sonner";
 import type { Application } from "@/lib/types";
 
@@ -66,9 +68,8 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
         );
     }
 
-    const userRole = (session?.user as any)?.role;
+    const { isStaff } = usePermissions();
     const isOwner = application.applicant.id === (session?.user as any)?.id;
-    const isOfficerOrAdmin = userRole === "OFFICER" || userRole === "ADMIN";
 
     const handleDeleteDocument = async (documentId: string) => {
         try {
@@ -264,7 +265,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                         </Card>
                     )}
 
-                    {isOfficerOrAdmin && (
+                    <StaffOnly>
                         <Card>
                             <CardHeader>
                                 <CardTitle>Officer Actions</CardTitle>
@@ -275,7 +276,7 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                                 </Button>
                             </CardContent>
                         </Card>
-                    )}
+                    </StaffOnly>
                 </div>
             </div>
         </div>

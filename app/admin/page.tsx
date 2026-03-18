@@ -23,7 +23,7 @@ import { Loader2, Users, Shield, FileText } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateTime } from "@/lib/utils";
 import { adminApi, type AdminUser } from "@/lib/services/admin";
-import type { UserRole } from "@/lib/types";
+import { usePermissions } from "@/hooks/usePermissions";
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -31,8 +31,7 @@ export default function AdminPage() {
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
 
-    const userRole = (session?.user as { role: UserRole })?.role;
-    const isAdmin = userRole === "ADMIN";
+    const { isAdmin } = usePermissions();
 
     useEffect(() => {
         if (status === "loading") return;

@@ -10,7 +10,8 @@ import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { FileText, PlusCircle, Eye, Download, AlertCircle, Bell } from "lucide-react";
 import Link from "next/link";
 import { useApplications, useNotifications } from "@/lib/queries";
-import type { UserRole } from "@/lib/types";
+import { usePermissions } from "@/hooks/usePermissions";
+import { ApplicantOnly, StaffOnly } from "@/components/permission-guard";
 
 const STATUS_STATS = [
     { status: "SUBMITTED", label: "Submitted", color: "bg-blue-500" },
@@ -110,6 +111,7 @@ function ApplicationDetails({ id }: { id: string }) {
 export default function DashboardPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
+    const { isApplicant, isStaff } = usePermissions();
     const { data: notificationsData, isLoading: loadingNotifications } = useNotifications();
 
     const { data: listData, isLoading, error } = useApplications({ limit: 100 });
@@ -130,10 +132,6 @@ export default function DashboardPage() {
         return null;
     }
 
-    const userRole = (session?.user as { role: UserRole })?.role;
-    const isApplicant = userRole === "APPLICANT";
-    const isStaff = userRole === "OFFICER" || userRole === "ADMIN";
-
     const recentApplications = applications.slice(0, 5);
 
     return (
@@ -145,12 +143,12 @@ export default function DashboardPage() {
                         Welcome back, {session?.user?.name || "User"}
                     </p>
                 </div>
-                {isApplicant && (
+                <ApplicantOnly>
                     <Button render={<Link href="/applications/new" />}>
                         <PlusCircle className="h-4 w-4 mr-2" />
                         Submit New Application
                     </Button>
-                )}
+                </ApplicantOnly>
             </div>
 
             {/* Stats Cards */}
@@ -255,30 +253,26 @@ export default function DashboardPage() {
                         <CardDescription>Common tasks and shortcuts</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        {isApplicant && (
-                            <>
-                                <Button className="w-full justify-start" render={<Link href="/applications/new" />}>
-                                    <PlusCircle className="h-4 w-4 mr-2" />
-                                    Submit New Application
-                                </Button>
-                                <Button variant="outline" className="w-full justify-start" render={<Link href="/applications" />}>
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    View My Applications
-                                </Button>
-                            </>
-                        )}
-                        {isStaff && (
-                            <>
-                                <Button className="w-full justify-start" render={<Link href="/officer/applications" />}>
-                                    <Eye className="h-4 w-4 mr-2" />
-                                    Review Applications
-                                </Button>
-                                <Button variant="outline" className="w-full justify-start" render={<Link href="/applications" />}>
-                                    <FileText className="h-4 w-4 mr-2" />
-                                    All Applications
-                                </Button>
-                            </>
-                        )}
+                        <ApplicantOnly>
+                            <Button className="w-full justify-start" render={<Link href="/applications/new" />}>
+                                <PlusCircle className="h-4 w-4 mr-2" />
+                                Submit New Application
+                            </Button>
+                            <Button variant="outline" className="w-full justify-start" render={<Link href="/applications" />}>
+                                <FileText className="h-4 w-4 mr-2" />
+                                View My Applications
+                            </Button>
+                        </ApplicantOnly>
+                        <StaffOnly>
+                            <Button className="w-full justify-start" render={<Link href="/officer/applications" />}>
+                                <Eye className="h-4 w-4 mr-2" />
+                                Review Applications
+                            </Button>
+                            <Button variant="outline" className="w-full justify-start" render={<Link href="/applications" />}>
+                                <FileText className="h-4 w-4 mr-2" />
+                                All Applications
+                            </Button>
+                        </StaffOnly>
                         <Button variant="outline" className="w-full justify-start" render={<Link href="/map" />}>
                             <Download className="h-4 w-4 mr-2" />
                             Permit Map

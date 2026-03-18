@@ -21,6 +21,7 @@ import {
     useRequireCorrections,
     useCreateComment,
 } from "@/lib/queries";
+import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "sonner";
 
 const TIMELINE_COLORS: Record<string, string> = {
@@ -41,8 +42,8 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [aiSummary, setAiSummary] = useState<string | null>(null);
 
+    const { isStaff, isAdmin } = usePermissions();
     const userRole = (session?.user as any)?.role;
-    const isStaff = userRole === "OFFICER" || userRole === "ADMIN";
 
     const { data: application, isLoading, error } = useOfficerApplication(resolvedParams?.id || "");
 
@@ -152,7 +153,7 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
     };
 
     const canDecide =
-        application.officer?.id === (session?.user as any)?.id || userRole === "ADMIN";
+        application.officer?.id === (session?.user as any)?.id || isAdmin;
     const isAssigned = !!application.officer;
     const isFinal = ["APPROVED", "REJECTED"].includes(application.status);
     const isAwaitingCorrections = application.status === "REQUIRES_CORRECTION";
