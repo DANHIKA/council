@@ -78,10 +78,11 @@ export async function POST(req: NextRequest) {
         }
 
         // ── Fetch permit data ─────────────────────────────────────────────
+        type PermitWithReqs = { name: string; description?: string | null; requirements: { label: string; required: boolean }[]; [key: string]: unknown };
         const permitTypes = await prisma.permitType.findMany({
             include: { requirements: { select: { label: true, required: true } } },
-        });
-        const permitNames = permitTypes.map((p: { name: string }) => p.name);
+        }) as PermitWithReqs[];
+        const permitNames = permitTypes.map((p) => p.name);
 
         const needsDocs = DOCS_RE.test(lastUserMessage.toLowerCase());
         const isAffirmative = AFFIRMATIVE_RE.test(lastUserMessage);
