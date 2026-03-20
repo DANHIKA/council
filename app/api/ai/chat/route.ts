@@ -81,7 +81,7 @@ export async function POST(req: NextRequest) {
         const permitTypes = await prisma.permitType.findMany({
             include: { requirements: { select: { label: true, required: true } } },
         });
-        const permitNames = permitTypes.map((p) => p.name);
+        const permitNames = permitTypes.map((p: { name: string }) => p.name);
 
         const needsDocs = DOCS_RE.test(lastUserMessage.toLowerCase());
         const isAffirmative = AFFIRMATIVE_RE.test(lastUserMessage);
