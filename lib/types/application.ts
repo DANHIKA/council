@@ -7,6 +7,7 @@ export interface Application {
     latitude?: number;
     longitude?: number;
     status: ApplicationStatus;
+    paymentStatus: PaymentStatus;
     createdAt: string;
     updatedAt: string;
     reviewedAt?: string;
@@ -18,6 +19,7 @@ export interface Application {
     comments: Comment[];
     certificate?: Certificate;
     timeline: TimelineEvent[];
+    payment?: Payment;
 }
 
 export interface Applicant {
@@ -38,6 +40,8 @@ export interface PermitTypeRef {
     id: string;
     name: string;
     code: string;
+    fee?: number;
+    currency?: string;
     requirements: PermitRequirement[];
 }
 
@@ -85,12 +89,23 @@ export interface TimelineEvent {
     createdAt: string;
 }
 
-export type ApplicationStatus = 
+export type ApplicationStatus =
     | "SUBMITTED"
     | "UNDER_REVIEW"
     | "APPROVED"
     | "REJECTED"
     | "REQUIRES_CORRECTION";
+
+export type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "WAIVED";
+
+export interface Payment {
+    id: string;
+    txRef: string;
+    amount: number;
+    currency: string;
+    status: PaymentStatus;
+    createdAt: string;
+}
 
 export type DocumentStatus = "PENDING" | "APPROVED" | "REJECTED";
 
@@ -99,6 +114,8 @@ export interface PermitType {
     code: string;
     name: string;
     description?: string;
+    fee: number;
+    currency: string;
     requirements: PermitRequirement[];
 }
 

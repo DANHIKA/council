@@ -5,7 +5,7 @@ export function useNotifications() {
     return useQuery({
         queryKey: ["notifications"],
         queryFn: () => notificationsApi.getAll(),
-        refetchInterval: 30000, // Poll every 30 seconds
+        refetchInterval: 120_000, // Fallback poll — SSE is the primary push mechanism
     });
 }
 

@@ -1,8 +1,8 @@
 "use client";
 
-import { useState, useEffect } from "react";
+import { useState, useEffect, Suspense } from "react";
 import { useSession } from "next-auth/react";
-import { useRouter } from "next/navigation";
+import { useRouter, useSearchParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -14,10 +14,12 @@ import Link from "next/link";
 import { useApplication, useApplicationDocuments, useDeleteDocument, useCreateComment, useDownloadCertificate } from "@/lib/queries";
 import { usePermissions } from "@/hooks/usePermissions";
 import { StaffOnly } from "@/components/permission-guard";
+import { EditApplicationSheet } from "@/components/edit-application-sheet";
+import { PaymentCard } from "@/components/payment-card";
 import { toast } from "sonner";
 import type { Application } from "@/lib/types";
 
-export default function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }> }) {
     const { data: session, status } = useSession();
     const router = useRouter();
     const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
@@ -69,7 +71,31 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
     }
 
     const { isStaff } = usePermissions();
+    const searchParams = useSearchParams();
     const isOwner = application.applicant.id === (session?.user as any)?.id;
+    const [editSheetOpen, setEditSheetOpen] = useState(false);
+
+    // Open edit sheet when redirected from /edit page
+    useEffect(() => {
+        if (searchParams.get("edit") === "1") {
+            setEditSheetOpen(true);
+            const url = new URL(window.location.href);
+            url.searchParams.delete("edit");
+            window.history.replaceState({}, "", url.toString());
+        }
+    }, [searchParams]);
+
+    // Show payment result toast after redirect from Paychangu
+    useEffect(() => {
+        const paymentParam = searchParams.get("payment");
+        if (!paymentParam) return;
+        if (paymentParam === "success") toast.success("Payment confirmed! Your application is now being processed.");
+        else if (paymentParam === "failed") toast.error("Payment failed. Please try again.");
+        else if (paymentParam === "cancelled") toast.info("Payment was cancelled.");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("payment");
+        window.history.replaceState({}, "", url.toString());
+    }, [searchParams]);
 
     const handleDeleteDocument = async (documentId: string) => {
         try {
@@ -160,9 +186,9 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                         <CardHeader>
                             <CardTitle>Documents</CardTitle>
                             {isOwner && application.status !== "APPROVED" && application.status !== "REJECTED" && (
-                                <Button size="sm" render={<Link href={`/applications/${application.id}/edit`} />}>
+                                <Button size="sm" onClick={() => setEditSheetOpen(true)}>
                                     <Plus className="h-4 w-4 mr-1" />
-                                    Add Document
+                                    {application.status === "REQUIRES_CORRECTION" ? "Submit corrections" : "Add document"}
                                 </Button>
                             )}
                         </CardHeader>
@@ -243,6 +269,16 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                 </div>
 
                 <div className="space-y-6">
+                    {/* Payment card — shown to the owner when fee is pending or failed */}
+                    {isOwner && application.permitTypeRef && Number(application.permitTypeRef.fee ?? 0) > 0 && (
+                        <PaymentCard
+                            applicationId={application.id}
+                            paymentStatus={application.paymentStatus ?? "PENDING"}
+                            fee={Number(application.permitTypeRef.fee)}
+                            currency={application.permitTypeRef.currency ?? "MWK"}
+                        />
+                    )}
+
                     {application.certificate && (
                         <Card>
                             <CardHeader>
@@ -279,6 +315,22 @@ export default function ApplicationDetailPage({ params }: { params: Promise<{ id
                     </StaffOnly>
                 </div>
             </div>
+
+            {resolvedParams && (
+                <EditApplicationSheet
+                    applicationId={resolvedParams.id}
+                    open={editSheetOpen}
+                    onOpenChange={setEditSheetOpen}
+                />
+            )}
         </div>
+    );
+}
+
+export default function ApplicationDetailPage({ params }: { params: Promise<{ id: string }> }) {
+    return (
+        <Suspense>
+            <ApplicationDetailPageInner params={params} />
+        </Suspense>
     );
 }

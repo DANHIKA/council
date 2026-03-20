@@ -144,7 +144,7 @@ export default function DashboardPage() {
                     </p>
                 </div>
                 <ApplicantOnly>
-                    <Button render={<Link href="/applications/new" />}>
+                    <Button render={<Link href="/applications?new=1" />}>
                         <PlusCircle className="h-4 w-4 mr-2" />
                         Submit New Application
                     </Button>
@@ -170,7 +170,7 @@ export default function DashboardPage() {
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Recent Applications */}
-                <Card>
+                <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Recent Applications</CardTitle>
                         <CardDescription>Your latest permit applications</CardDescription>
@@ -247,14 +247,14 @@ export default function DashboardPage() {
                 </Card>
 
                 {/* Quick Actions */}
-                <Card>
+                <Card className="lg:col-span-2">
                     <CardHeader>
                         <CardTitle>Quick Actions</CardTitle>
                         <CardDescription>Common tasks and shortcuts</CardDescription>
                     </CardHeader>
                     <CardContent className="space-y-3">
                         <ApplicantOnly>
-                            <Button className="w-full justify-start" render={<Link href="/applications/new" />}>
+                            <Button className="w-full justify-start" render={<Link href="/applications?new=1" />}>
                                 <PlusCircle className="h-4 w-4 mr-2" />
                                 Submit New Application
                             </Button>
@@ -279,85 +279,7 @@ export default function DashboardPage() {
                         </Button>
                     </CardContent>
                 </Card>
-
-                {/* Latest Notifications */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2">
-                            <Bell className="h-5 w-5" />
-                            Latest Notifications
-                        </CardTitle>
-                        <CardDescription>Stay updated on your applications</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {loadingNotifications ? (
-                            <p className="text-muted-foreground">Loading notifications...</p>
-                        ) : notifications.length === 0 ? (
-                            <p className="text-muted-foreground text-center py-8">
-                                No notifications yet
-                            </p>
-                        ) : (
-                            <div className="space-y-4">
-                                {notifications.map((notification) => (
-                                    <Link
-                                        key={notification.id}
-                                        href={notification.link || "#"}
-                                        className={`block p-3 rounded-lg border transition-colors hover:bg-muted/50 ${!notification.read ? "bg-muted/30 border-primary/20" : ""}`}
-                                    >
-                                        <div className="flex justify-between items-start mb-1">
-                                            <h4 className="font-medium text-sm">{notification.title}</h4>
-                                            {!notification.read && (
-                                                <Badge variant="default" className="text-[10px] px-1.5 h-4">New</Badge>
-                                            )}
-                                        </div>
-                                        <p className="text-xs text-muted-foreground line-clamp-1">
-                                            {notification.message}
-                                        </p>
-                                        <p className="text-[10px] text-muted-foreground mt-2">
-                                            {formatDateTime(notification.createdAt)}
-                                        </p>
-                                    </Link>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
             </div>
-
-            {/* Alerts for corrections needed */}
-            {applications.some(app => app.status === "REQUIRES_CORRECTION") && (
-                <Card className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-orange-800 dark:text-orange-300">
-                            <AlertCircle className="h-5 w-5" />
-                            Action Required
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent>
-                        <p className="text-orange-700 dark:text-orange-400 mb-4">
-                            You have applications that require corrections. Please review and resubmit them.
-                        </p>
-                        <div className="space-y-2">
-                            {applications
-                                .filter(app => app.status === "REQUIRES_CORRECTION")
-                                .slice(0, 3)
-                                .map(app => (
-                                    <div key={app.id} className="flex items-center justify-between p-2 bg-white dark:bg-background rounded border">
-                                        <div>
-                                            <p className="font-medium">{app.permitType}</p>
-                                            <p className="text-sm text-muted-foreground">
-                                                {formatDateTime(app.updatedAt)}
-                                            </p>
-                                        </div>
-                                        <Button size="sm" render={<Link href={`/applications/${app.id}/edit`} />}>
-                                            Fix &amp; Resubmit
-                                        </Button>
-                                    </div>
-                                ))}
-                        </div>
-                    </CardContent>
-                </Card>
-            )}
         </div>
     );
 }

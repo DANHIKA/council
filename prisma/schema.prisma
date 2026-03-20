@@ -29,11 +29,20 @@ enum DocumentStatus {
   REJECTED
 }
 
+enum PaymentStatus {
+  PENDING
+  PAID
+  FAILED
+  WAIVED
+}
+
 model PermitType {
   id           String             @id @default(cuid())
   code         String             @unique
   name         String
   description  String?            @db.Text
+  fee          Decimal            @default(0) @db.Decimal(10, 2)
+  currency     String             @default("MWK")
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
@@ -139,10 +148,12 @@ model PermitApplication {
   reviewedAt  DateTime?
   approvedAt  DateTime?
 
-  documents   Document[]
-  comments    Comment[]
-  certificate Certificate?
-  timeline    TimelineEvent[]
+  documents     Document[]
+  comments      Comment[]
+  certificate   Certificate?
+  timeline      TimelineEvent[]
+  payment       Payment?
+  paymentStatus PaymentStatus @default(PENDING)
 }
 
 model Document {
@@ -194,6 +205,19 @@ model TimelineEvent {
   applicationId String
   application   PermitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   createdAt     DateTime          @default(now())
+}
+
+model Payment {
+  id            String        @id @default(cuid())
+  txRef         String        @unique
+  amount        Decimal       @db.Decimal(10, 2)
+  currency      String        @default("MWK")
+  status        PaymentStatus @default(PENDING)
+  paychanguTxId String?
+  applicationId String        @unique
+  application   PermitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  createdAt     DateTime      @default(now())
+  updatedAt     DateTime      @updatedAt
 }
 
 model Notification {

@@ -7,6 +7,7 @@ export interface UserProfile {
     role: string;
     phone: string | null;
     organization: string | null;
+    image: string | null;
     createdAt?: string;
 }
 
@@ -16,7 +17,7 @@ export interface ProfileResponse {
 
 export const profileApi = {
     getProfile: () => http.get<ProfileResponse>("/api/profile"),
-    
-    updateProfile: (data: { name: string; phone?: string; organization?: string }) => 
+
+    updateProfile: (data: { name: string; phone?: string; organization?: string; image?: string }) =>
         http.patch<ProfileResponse>("/api/profile", data),
 };

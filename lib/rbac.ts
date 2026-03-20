@@ -68,12 +68,6 @@ export const NAV_ITEMS = [
         roles: ["APPLICANT"] as UserRole[],
     },
     {
-        title: "New Application",
-        href: "/applications/new",
-        icon: "AddCircleIcon" as const,
-        roles: ["APPLICANT"] as UserRole[],
-    },
-    {
         title: "Review Queue",
         href: "/officer/applications",
         icon: "UserGroupIcon" as const,
@@ -89,12 +83,6 @@ export const NAV_ITEMS = [
         title: "Permit Map",
         href: "/map",
         icon: "Location01Icon" as const,
-        roles: null,
-    },
-    {
-        title: "Profile",
-        href: "/profile",
-        icon: "UserIcon" as const,
         roles: null,
     },
     {

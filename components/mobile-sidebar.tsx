@@ -10,10 +10,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
     Home01Icon,
     Note01Icon,
-    AddCircleIcon,
     UserGroupIcon,
     Location01Icon,
-    UserIcon,
     DashboardCircleIcon,
     File02Icon,
     Menu01Icon,
@@ -54,12 +52,6 @@ export function MobileSidebar() {
                 icon: Note01Icon,
                 active: pathname === "/applications",
             },
-            {
-                title: "New Application",
-                href: "/applications/new",
-                icon: AddCircleIcon,
-                active: pathname === "/applications/new",
-            },
         ] : []),
         ...(isOfficer || isAdmin ? [
             {
@@ -80,12 +72,6 @@ export function MobileSidebar() {
             href: "/map",
             icon: Location01Icon,
             active: pathname === "/map",
-        },
-        {
-            title: "Profile",
-            href: "/profile",
-            icon: UserIcon,
-            active: pathname === "/profile",
         },
         ...(isAdmin ? [
             {

@@ -1,17 +1,19 @@
 "use client";
 
-import { useState } from "react";
+import { useState, useMemo } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
-import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
-import { Search, Filter, Eye, FileText, Download } from "lucide-react";
+import { Search, Filter, Eye, FileText, Download, Clock, CheckCircle, XCircle, AlertCircle } from "lucide-react";
 import Link from "next/link";
 import { useOfficerQueue } from "@/lib/queries";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 
 const STATUS_OPTIONS = [
     { value: "all", label: "All Statuses" },
@@ -21,6 +23,16 @@ const STATUS_OPTIONS = [
     { value: "REJECTED", label: "Rejected" },
     { value: "REQUIRES_CORRECTION", label: "Requires Correction" },
 ];
+
+const STATUS_STATS = [
+    { status: "SUBMITTED", label: "Submitted", color: "#3b82f6", icon: Clock },
+    { status: "UNDER_REVIEW", label: "Under Review", color: "#f59e0b", icon: Clock },
+    { status: "APPROVED", label: "Approved", color: "#22c55e", icon: CheckCircle },
+    { status: "REJECTED", label: "Rejected", color: "#ef4444", icon: XCircle },
+    { status: "REQUIRES_CORRECTION", label: "Needs Correction", color: "#f97316", icon: AlertCircle },
+];
+
+const CHART_COLORS = ["#3b82f6", "#f59e0b", "#22c55e", "#ef4444", "#f97316"];
 
 import {
     Table,
@@ -128,7 +140,7 @@ export default function OfficerApplicationsPage() {
         q: search,
         status: statusFilter === "all" ? undefined : statusFilter,
         page,
-        limit: 20,
+        limit: 100,
     });
 
     if (status === "loading") return null;
@@ -144,18 +156,141 @@ export default function OfficerApplicationsPage() {
     const applications = listData?.data || [];
     const pagination = listData?.pagination;
 
+    // Calculate stats
+    const stats = useMemo(() => {
+        const statusCounts = STATUS_STATS.map(s => ({
+            ...s,
+            count: applications.filter(a => a.status === s.status).length
+        }));
+        
+        const totalReviewed = applications.filter(a => 
+            a.status === "APPROVED" || a.status === "REJECTED"
+        ).length;
+        
+        const approvalRate = totalReviewed > 0 
+            ? Math.round((applications.filter(a => a.status === "APPROVED").length / totalReviewed) * 100)
+            : 0;
+
+        return { statusCounts, total: applications.length, approvalRate };
+    }, [applications]);
+
+    // Chart data
+    const pieData = stats.statusCounts.map(s => ({
+        name: s.label,
+        value: s.count,
+        fill: s.color
+    }));
+
+    const chartConfig = {
+        submitted: { label: "Submitted", color: CHART_COLORS[0] },
+        underReview: { label: "Under Review", color: CHART_COLORS[1] },
+        approved: { label: "Approved", color: CHART_COLORS[2] },
+        rejected: { label: "Rejected", color: CHART_COLORS[3] },
+        correction: { label: "Needs Correction", color: CHART_COLORS[4] },
+    };
+
     return (
         <div className="container mx-auto py-8 max-w-7xl space-y-6">
             <div className="flex items-center justify-between">
                 <div>
-                    <h1 className="text-2xl font-bold">Officer Queue</h1>
+                    <h1 className="text-2xl font-bold">Officer Dashboard</h1>
                     <p className="text-muted-foreground">Review and manage permit applications</p>
                 </div>
             </div>
 
+            {/* Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-5">
+                {STATUS_STATS.map(({ status, label, color, icon: Icon }) => {
+                    const count = stats.statusCounts.find(s => s.status === status)?.count || 0;
+                    return (
+                        <Card key={status}>
+                            <CardContent className="p-4">
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <p className="text-2xl font-bold">{count}</p>
+                                        <p className="text-xs text-muted-foreground">{label}</p>
+                                    </div>
+                                    <div className="h-10 w-10 rounded-full flex items-center justify-center" style={{ backgroundColor: `${color}20` }}>
+                                        <Icon className="h-5 w-5" style={{ color }} />
+                                    </div>
+                                </div>
+                            </CardContent>
+                        </Card>
+                    );
+                })}
+            </div>
+
+            {/* Charts */}
+            <div className="grid gap-6 md:grid-cols-2">
+                {/* Status Distribution Pie Chart */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Application Status</CardTitle>
+                        <CardDescription>Distribution by status</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={chartConfig} className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={pieData}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={50}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {pieData.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip content={<ChartTooltipContent />} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                        <div className="flex flex-wrap justify-center gap-3 mt-4">
+                            {pieData.map((item) => (
+                                <div key={item.name} className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
+                                    <span className="text-xs text-muted-foreground">{item.name}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Approval Rate Bar Chart */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Review Statistics</CardTitle>
+                        <CardDescription>Approval rate and review metrics</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={chartConfig} className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <BarChart data={[
+                                    { name: "Reviewed", value: stats.total - (stats.statusCounts.find(s => s.status === "SUBMITTED")?.count || 0) - (stats.statusCounts.find(s => s.status === "UNDER_REVIEW")?.count || 0), fill: CHART_COLORS[2] },
+                                    { name: "Pending", value: (stats.statusCounts.find(s => s.status === "SUBMITTED")?.count || 0) + (stats.statusCounts.find(s => s.status === "UNDER_REVIEW")?.count || 0), fill: CHART_COLORS[0] },
+                                    { name: "Approved", value: stats.statusCounts.find(s => s.status === "APPROVED")?.count || 0, fill: CHART_COLORS[2] },
+                                    { name: "Rejected", value: stats.statusCounts.find(s => s.status === "REJECTED")?.count || 0, fill: CHART_COLORS[3] },
+                                ]}>
+                                    <CartesianGrid strokeDasharray="3 3" vertical={false} />
+                                    <XAxis dataKey="name" fontSize={12} />
+                                    <YAxis allowDecimals={false} fontSize={12} />
+                                    <Tooltip content={<ChartTooltipContent />} />
+                                    <Bar dataKey="value" radius={4} />
+                                </BarChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* Applications Table */}
             <Card>
                 <CardHeader>
-                    <CardTitle>Applications</CardTitle>
+                    <CardTitle>Application Queue</CardTitle>
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex flex-col sm:flex-row gap-4">

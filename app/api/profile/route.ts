@@ -7,6 +7,7 @@ const updateProfileSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     phone: z.string().optional(),
     organization: z.string().optional(),
+    image: z.string().optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -57,6 +58,7 @@ export async function PATCH(req: NextRequest) {
                 name: validated.name,
                 phone: validated.phone,
                 organization: validated.organization,
+                ...(validated.image !== undefined && { image: validated.image }),
             },
             select: {
                 id: true,
@@ -65,6 +67,7 @@ export async function PATCH(req: NextRequest) {
                 role: true,
                 phone: true,
                 organization: true,
+                image: true,
             },
         });
 

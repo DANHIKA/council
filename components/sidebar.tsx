@@ -8,10 +8,8 @@ import { HugeiconsIcon } from "@hugeicons/react";
 import {
     Home01Icon,
     Note01Icon,
-    AddCircleIcon,
     UserGroupIcon,
     Location01Icon,
-    UserIcon,
     DashboardCircleIcon,
     File02Icon,
 } from "@hugeicons/core-free-icons";
@@ -20,10 +18,8 @@ import { usePermissions } from "@/hooks/usePermissions";
 const ICON_MAP = {
     Home01Icon,
     Note01Icon,
-    AddCircleIcon,
     UserGroupIcon,
     Location01Icon,
-    UserIcon,
     DashboardCircleIcon,
     File02Icon,
 } as const;

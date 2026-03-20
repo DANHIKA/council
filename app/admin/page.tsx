@@ -24,6 +24,10 @@ import { toast } from "sonner";
 import { formatDateTime } from "@/lib/utils";
 import { adminApi, type AdminUser } from "@/lib/services/admin";
 import { usePermissions } from "@/hooks/usePermissions";
+import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
+
+const CHART_COLORS = ["#22c55e", "#3b82f6", "#ef4444", "#f59e0b"];
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -87,7 +91,30 @@ export default function AdminPage() {
 
     const totalUsers = users.length;
     const totalOfficers = users.filter(u => u.role === "OFFICER").length;
+    const totalAdmins = users.filter(u => u.role === "ADMIN").length;
     const totalApplicants = users.filter(u => u.role === "APPLICANT").length;
+
+    // Chart data
+    const userDistribution = [
+        { name: "Applicants", value: totalApplicants, fill: CHART_COLORS[0] },
+        { name: "Officers", value: totalOfficers, fill: CHART_COLORS[1] },
+        { name: "Admins", value: totalAdmins, fill: CHART_COLORS[2] },
+    ];
+
+    const applicationsPerUser = users
+        .filter(u => u._count.applications > 0)
+        .slice(0, 10)
+        .map(u => ({
+            name: u.name?.split(" ")[0] || "Unknown",
+            applications: u._count.applications,
+        }));
+
+    const chartConfig = {
+        applicants: { label: "Applicants", color: CHART_COLORS[0] },
+        officers: { label: "Officers", color: CHART_COLORS[1] },
+        admins: { label: "Admins", color: CHART_COLORS[2] },
+        applications: { label: "Applications", color: CHART_COLORS[3] },
+    };
 
     return (
         <div className="container mx-auto py-8 max-w-7xl space-y-8">
@@ -96,7 +123,8 @@ export default function AdminPage() {
                 <p className="text-muted-foreground">System administration and user management</p>
             </div>
 
-            <div className="grid gap-4 md:grid-cols-3">
+            {/* Stats Cards */}
+            <div className="grid gap-4 md:grid-cols-4">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -104,6 +132,15 @@ export default function AdminPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{totalUsers}</div>
+                    </CardContent>
+                </Card>
+                <Card>
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Admins</CardTitle>
+                        <Shield className="h-4 w-4 text-muted-foreground" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-2xl font-bold">{totalAdmins}</div>
                     </CardContent>
                 </Card>
                 <Card>
@@ -126,6 +163,75 @@ export default function AdminPage() {
                 </Card>
             </div>
 
+            {/* Charts */}
+            <div className="grid gap-6 md:grid-cols-2">
+                {/* User Distribution Pie Chart */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>User Distribution</CardTitle>
+                        <CardDescription>Breakdown of users by role</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        <ChartContainer config={chartConfig} className="h-[250px]">
+                            <ResponsiveContainer width="100%" height="100%">
+                                <PieChart>
+                                    <Pie
+                                        data={userDistribution}
+                                        cx="50%"
+                                        cy="50%"
+                                        innerRadius={60}
+                                        outerRadius={80}
+                                        paddingAngle={5}
+                                        dataKey="value"
+                                    >
+                                        {userDistribution.map((entry, index) => (
+                                            <Cell key={`cell-${index}`} fill={entry.fill} />
+                                        ))}
+                                    </Pie>
+                                    <Tooltip content={<ChartTooltipContent />} />
+                                </PieChart>
+                            </ResponsiveContainer>
+                        </ChartContainer>
+                        <div className="flex justify-center gap-4 mt-4">
+                            {userDistribution.map((item) => (
+                                <div key={item.name} className="flex items-center gap-2">
+                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
+                                    <span className="text-sm text-muted-foreground">{item.name}: {item.value}</span>
+                                </div>
+                            ))}
+                        </div>
+                    </CardContent>
+                </Card>
+
+                {/* Applications per User Bar Chart */}
+                <Card>
+                    <CardHeader>
+                        <CardTitle>Top Users by Applications</CardTitle>
+                        <CardDescription>Most active applicants</CardDescription>
+                    </CardHeader>
+                    <CardContent>
+                        {applicationsPerUser.length === 0 ? (
+                            <div className="h-[250px] flex items-center justify-center text-muted-foreground">
+                                No applications yet
+                            </div>
+                        ) : (
+                            <ChartContainer config={chartConfig} className="h-[250px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={applicationsPerUser} layout="vertical">
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                        <XAxis type="number" allowDecimals={false} />
+                                        <YAxis dataKey="name" type="category" width={80} />
+                                        <Tooltip content={<ChartTooltipContent />} />
+                                        <Bar dataKey="applications" fill="var(--color-applications)" radius={4} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </ChartContainer>
+                        )}
+                    </CardContent>
+                </Card>
+            </div>
+
+            {/* User Management Table */}
             <Card>
                 <CardHeader>
                     <CardTitle>User Management</CardTitle>

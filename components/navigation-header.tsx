@@ -9,12 +9,14 @@ import { Avatar, AvatarFallback } from "@/components/ui/avatar";
 import {
     DropdownMenu,
     DropdownMenuContent,
+    DropdownMenuGroup,
     DropdownMenuItem,
     DropdownMenuLabel,
     DropdownMenuSeparator,
     DropdownMenuTrigger,
 } from "@/components/ui/dropdown-menu";
 import {
+    Command,
     CommandDialog,
     CommandInput,
     CommandList,
@@ -27,7 +29,6 @@ import {
 import { Badge } from "@/components/ui/badge";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
-    Tick01Icon,
     Notification01Icon,
     ArrowDown01Icon,
     Logout01Icon,
@@ -36,11 +37,13 @@ import {
     UserGroupIcon
 } from "@hugeicons/core-free-icons";
 import { LayoutDashboard, FileText, PlusCircle, Map, Users, Search } from "lucide-react";
-import { formatDateTime } from "@/lib/utils";
-import { useNotifications, useMarkNotificationRead, useMarkAllNotificationsRead } from "@/lib/queries";
-import type { UserRole } from "@/lib/types";
+import { useNotifications } from "@/lib/queries";
+import { usePermissions } from "@/hooks/usePermissions";
+import { useNotificationStream } from "@/hooks/useNotificationStream";
 import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileSidebar } from "@/components/mobile-sidebar";
+import { ProfileSheet } from "@/components/profile-sheet";
+import { NotificationsSheet } from "@/components/notifications-sheet";
 
 function useCommandPalette(userRole: string, router: ReturnType<typeof useRouter>) {
     const [open, setOpen] = useState(false);
@@ -70,37 +73,22 @@ export function NavigationHeader() {
     const { data: session, status } = useSession();
     const router = useRouter();
     const { data: notificationsData } = useNotifications();
-    const markReadMutation = useMarkNotificationRead();
-    const markAllReadMutation = useMarkAllNotificationsRead();
+    useNotificationStream();
     const [mounted, setMounted] = useState(false);
+    const [notificationsOpen, setNotificationsOpen] = useState(false);
+    const [profileOpen, setProfileOpen] = useState(false);
 
     useEffect(() => {
         setMounted(true);
     }, []);
 
-    const notifications = notificationsData?.notifications || [];
     const unreadCount = notificationsData?.unreadCount || 0;
 
-    const userRole = (session?.user as { role: UserRole })?.role ?? "";
+    const { role: userRole, isStaff, isAdmin } = usePermissions();
+    const safeRole = userRole ?? "";
 
-    const { open: cmdOpen, setOpen: setCmdOpen, navigate: cmdNavigate, isStaff } =
-        useCommandPalette(userRole, router);
-
-    const markAsRead = async (id: string) => {
-        try {
-            await markReadMutation.mutateAsync(id);
-        } catch (err) {
-            console.error("Failed to mark notification as read:", err);
-        }
-    };
-
-    const markAllAsRead = async () => {
-        try {
-            await markAllReadMutation.mutateAsync();
-        } catch (err) {
-            console.error("Failed to mark all as read:", err);
-        }
-    };
+    const { open: cmdOpen, setOpen: setCmdOpen, navigate: cmdNavigate } =
+        useCommandPalette(safeRole, router);
 
     // Prevent hydration mismatch
     if (!mounted || status === "loading") {
@@ -172,66 +160,14 @@ export function NavigationHeader() {
                     <ThemeToggle />
                     
                     {/* Notifications */}
-                        <DropdownMenu>
-                            <DropdownMenuTrigger
-                                render={
-                                    <Button variant="ghost" size="icon" className="relative">
-                                        <HugeiconsIcon icon={Notification01Icon} className="h-5 w-5" />
-                                        {unreadCount > 0 && (
-                                            <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] text-white">
-                                                {unreadCount > 9 ? "9+" : unreadCount}
-                                            </span>
-                                        )}
-                                    </Button>
-                                }
-                            />
-                            <DropdownMenuContent align="end" className="w-80 p-0">
-                                <div className="p-4 border-b flex items-center justify-between">
-                                    <h3 className="font-semibold">Notifications</h3>
-                                    {unreadCount > 0 && (
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="h-auto p-0 text-xs text-primary"
-                                            onClick={markAllAsRead}
-                                        >
-                                            Mark all as read
-                                        </Button>
-                                    )}
-                                </div>
-                                <div className="max-h-[400px] overflow-y-auto">
-                                    {notifications.length === 0 ? (
-                                        <div className="p-8 text-center text-muted-foreground text-sm">
-                                            No notifications yet
-                                        </div>
-                                    ) : (
-                                        notifications.map((n) => (
-                                            <DropdownMenuItem
-                                                key={n.id}
-                                                className={`p-4 flex flex-col items-start gap-1 cursor-pointer border-b last:border-0 ${!n.read ? "bg-muted/50" : ""}`}
-                                                render={
-                                                    <Link
-                                                        href={n.link || "#"}
-                                                        onClick={() => !n.read && markAsRead(n.id)}
-                                                    />
-                                                }
-                                            >
-                                                <div className="flex items-center justify-between w-full">
-                                                    <span className="font-medium text-sm">{n.title}</span>
-                                                    {!n.read && <HugeiconsIcon icon={Tick01Icon} className="h-2 w-2 fill-primary text-primary" />}
-                                                </div>
-                                                <p className="text-xs text-muted-foreground line-clamp-2">
-                                                    {n.message}
-                                                </p>
-                                                <span className="text-[10px] text-muted-foreground mt-1">
-                                                    {formatDateTime(n.createdAt)}
-                                                </span>
-                                            </DropdownMenuItem>
-                                        ))
-                                    )}
-                                </div>
-                            </DropdownMenuContent>
-                        </DropdownMenu>
+                        <Button variant="ghost" size="icon" className="relative" onClick={() => setNotificationsOpen(true)}>
+                            <HugeiconsIcon icon={Notification01Icon} className="h-5 w-5" />
+                            {unreadCount > 0 && (
+                                <span className="absolute top-1 right-1 flex h-4 w-4 items-center justify-center rounded-full bg-red-600 text-[10px] text-white">
+                                    {unreadCount > 9 ? "9+" : unreadCount}
+                                </span>
+                            )}
+                        </Button>
 
                         <DropdownMenu>
                             <DropdownMenuTrigger
@@ -242,8 +178,8 @@ export function NavigationHeader() {
                                         </Avatar>
                                         <div className="hidden sm:flex flex-col items-start text-left">
                                             <span className="text-sm font-medium">{userName}</span>
-                                            <Badge variant="secondary" className={`text-[10px] px-1 h-4 ${getRoleBadgeColor(userRole)}`}>
-                                                {getRoleLabel(userRole)}
+                                            <Badge variant="secondary" className={`text-[10px] px-1 h-4 ${getRoleBadgeColor(safeRole)}`}>
+                                                {getRoleLabel(safeRole)}
                                             </Badge>
                                         </div>
                                         <HugeiconsIcon icon={ArrowDown01Icon} className="h-4 w-4 text-muted-foreground" />
@@ -251,43 +187,45 @@ export function NavigationHeader() {
                                 }
                             />
                             <DropdownMenuContent align="end" className="w-56">
-                                <DropdownMenuLabel>
-                                    <div className="flex flex-col space-y-1">
-                                        <p className="text-sm font-medium">{userName}</p>
-                                        <p className="text-xs text-muted-foreground">{userEmail}</p>
-                                    </div>
-                                </DropdownMenuLabel>
+                                <DropdownMenuGroup>
+                                    <DropdownMenuLabel>
+                                        <div className="flex flex-col space-y-1">
+                                            <p className="text-sm font-medium">{userName}</p>
+                                            <p className="text-xs text-muted-foreground">{userEmail}</p>
+                                        </div>
+                                    </DropdownMenuLabel>
+                                </DropdownMenuGroup>
                                 <DropdownMenuSeparator />
 
-                                <DropdownMenuItem
-                                    render={
-                                        <Link href="/profile" className="flex items-center" />
-                                    }
-                                >
-                                    <HugeiconsIcon icon={UserIcon} className="mr-2 h-4 w-4" />
-                                    Profile
-                                </DropdownMenuItem>
-
-                                {userRole === "ADMIN" && (
-                                    <DropdownMenuItem
-                                        render={
-                                            <Link href="/admin" className="flex items-center" />
-                                        }
-                                    >
-                                        <HugeiconsIcon icon={UserGroupIcon} className="mr-2 h-4 w-4" />
-                                        Admin Dashboard
+                                <DropdownMenuGroup>
+                                    <DropdownMenuItem onClick={() => setProfileOpen(true)}>
+                                        <HugeiconsIcon icon={UserIcon} className="mr-2 h-4 w-4" />
+                                        Profile
                                     </DropdownMenuItem>
-                                )}
+
+                                    {isAdmin && (
+                                        <DropdownMenuItem
+                                            render={
+                                                <Link href="/admin" className="flex items-center" />
+                                            }
+                                        >
+                                            <HugeiconsIcon icon={UserGroupIcon} className="mr-2 h-4 w-4" />
+                                            Admin Dashboard
+                                        </DropdownMenuItem>
+                                    )}
+                                </DropdownMenuGroup>
 
                                 <DropdownMenuSeparator />
 
-                                <DropdownMenuItem
-                                    onClick={handleLogout}
-                                    className="text-destructive focus:text-destructive"
-                                >
-                                    <HugeiconsIcon icon={Logout01Icon} className="mr-2 h-4 w-4" />
-                                    Sign Out
-                                </DropdownMenuItem>
+                                <DropdownMenuGroup>
+                                    <DropdownMenuItem
+                                        onClick={handleLogout}
+                                        className="text-destructive focus:text-destructive"
+                                    >
+                                        <HugeiconsIcon icon={Logout01Icon} className="mr-2 h-4 w-4" />
+                                        Sign Out
+                                    </DropdownMenuItem>
+                                </DropdownMenuGroup>
                             </DropdownMenuContent>
                         </DropdownMenu>
                     </div>
@@ -296,65 +234,70 @@ export function NavigationHeader() {
 
         {/* Global Command Palette */}
         <CommandDialog open={cmdOpen} onOpenChange={setCmdOpen} title="Quick Navigation">
-            <CommandInput placeholder="Search pages and actions..." />
-            <CommandList>
-                <CommandEmpty>No results found.</CommandEmpty>
-                <CommandGroup heading="Navigation">
-                    <CommandItem onSelect={() => cmdNavigate("/dashboard")}>
-                        <LayoutDashboard className="h-4 w-4" />
-                        Dashboard
-                        <CommandShortcut>⌘D</CommandShortcut>
-                    </CommandItem>
-                    {!isStaff && (
-                        <CommandItem onSelect={() => cmdNavigate("/applications/new")}>
-                            <PlusCircle className="h-4 w-4" />
-                            New Application
+            <Command>
+                <CommandInput placeholder="Search pages and actions..." />
+                <CommandList>
+                    <CommandEmpty>No results found.</CommandEmpty>
+                    <CommandGroup heading="Navigation">
+                        <CommandItem onSelect={() => cmdNavigate("/dashboard")}>
+                            <LayoutDashboard className="h-4 w-4" />
+                            Dashboard
+                            <CommandShortcut>⌘D</CommandShortcut>
                         </CommandItem>
+                        {!isStaff && (
+                            <CommandItem onSelect={() => cmdNavigate("/applications?new=1")}>
+                                <PlusCircle className="h-4 w-4" />
+                                New Application
+                            </CommandItem>
+                        )}
+                        <CommandItem onSelect={() => cmdNavigate("/applications")}>
+                            <FileText className="h-4 w-4" />
+                            {isStaff ? "All Applications" : "My Applications"}
+                        </CommandItem>
+                        <CommandItem onSelect={() => cmdNavigate("/map")}>
+                            <Map className="h-4 w-4" />
+                            Permit Map
+                        </CommandItem>
+                    </CommandGroup>
+                    {isStaff && (
+                        <>
+                            <CommandSeparator />
+                            <CommandGroup heading="Officer">
+                                <CommandItem onSelect={() => cmdNavigate("/officer/applications")}>
+                                    <FileText className="h-4 w-4" />
+                                    Review Queue
+                                </CommandItem>
+                            </CommandGroup>
+                        </>
                     )}
-                    <CommandItem onSelect={() => cmdNavigate("/applications")}>
-                        <FileText className="h-4 w-4" />
-                        {isStaff ? "All Applications" : "My Applications"}
-                    </CommandItem>
-                    <CommandItem onSelect={() => cmdNavigate("/map")}>
-                        <Map className="h-4 w-4" />
-                        Permit Map
-                    </CommandItem>
-                </CommandGroup>
-                {isStaff && (
-                    <>
-                        <CommandSeparator />
-                        <CommandGroup heading="Officer">
-                            <CommandItem onSelect={() => cmdNavigate("/officer/applications")}>
-                                <FileText className="h-4 w-4" />
-                                Review Queue
-                            </CommandItem>
-                        </CommandGroup>
-                    </>
-                )}
-                {userRole === "ADMIN" && (
-                    <>
-                        <CommandSeparator />
-                        <CommandGroup heading="Admin">
-                            <CommandItem onSelect={() => cmdNavigate("/admin")}>
-                                <Users className="h-4 w-4" />
-                                Admin Dashboard
-                            </CommandItem>
-                        </CommandGroup>
-                    </>
-                )}
-                <CommandSeparator />
-                <CommandGroup heading="Account">
-                    <CommandItem onSelect={() => cmdNavigate("/profile")}>
-                        <HugeiconsIcon icon={UserIcon} className="h-4 w-4" />
-                        Profile
-                    </CommandItem>
-                    <CommandItem onSelect={() => signOut({ callbackUrl: "/auth/login" })} className="text-destructive data-selected:text-destructive">
-                        <HugeiconsIcon icon={Logout01Icon} className="h-4 w-4" />
-                        Sign Out
-                    </CommandItem>
-                </CommandGroup>
-            </CommandList>
+                    {userRole === "ADMIN" && (
+                        <>
+                            <CommandSeparator />
+                            <CommandGroup heading="Admin">
+                                <CommandItem onSelect={() => cmdNavigate("/admin")}>
+                                    <Users className="h-4 w-4" />
+                                    Admin Dashboard
+                                </CommandItem>
+                            </CommandGroup>
+                        </>
+                    )}
+                    <CommandSeparator />
+                    <CommandGroup heading="Account">
+                        <CommandItem onSelect={() => { setCmdOpen(false); setProfileOpen(true); }}>
+                            <HugeiconsIcon icon={UserIcon} className="h-4 w-4" />
+                            Profile
+                        </CommandItem>
+                        <CommandItem onSelect={() => signOut({ callbackUrl: "/auth/login" })} className="text-destructive data-selected:text-destructive">
+                            <HugeiconsIcon icon={Logout01Icon} className="h-4 w-4" />
+                            Sign Out
+                        </CommandItem>
+                    </CommandGroup>
+                </CommandList>
+            </Command>
         </CommandDialog>
+
+        <NotificationsSheet open={notificationsOpen} onOpenChange={setNotificationsOpen} />
+        <ProfileSheet open={profileOpen} onOpenChange={setProfileOpen} />
         </>
     );
 }
