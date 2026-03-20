@@ -13,7 +13,7 @@ export async function POST(req: NextRequest) {
 
         const permitTypes = await prisma.permitType.findMany({
             select: { name: true, description: true }
-        });
+        }) as { name: string; description: string | null }[];
 
         const relevantScenarios = getRelevantScenarios(description);
         const scenarioText = relevantScenarios
