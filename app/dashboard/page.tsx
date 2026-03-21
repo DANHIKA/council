@@ -12,14 +12,33 @@ import Link from "next/link";
 import { useApplications, useNotifications } from "@/lib/queries";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ApplicantOnly, StaffOnly } from "@/components/permission-guard";
+import {
+    BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
+    ResponsiveContainer, PieChart, Pie, Cell,
+} from "recharts";
+import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 
 const STATUS_STATS = [
     { status: "SUBMITTED", label: "Submitted", color: "bg-blue-500" },
     { status: "UNDER_REVIEW", label: "Under Review", color: "bg-yellow-500" },
+    { status: "PENDING_APPROVAL", label: "Pending Sign-off", color: "bg-purple-500" },
     { status: "APPROVED", label: "Approved", color: "bg-green-500" },
     { status: "REJECTED", label: "Rejected", color: "bg-red-500" },
     { status: "REQUIRES_CORRECTION", label: "Needs Correction", color: "bg-orange-500" },
 ];
+
+const STATUS_CHART_COLORS: Record<string, string> = {
+    SUBMITTED: "hsl(217, 91%, 60%)",
+    UNDER_REVIEW: "hsl(48, 96%, 53%)",
+    PENDING_APPROVAL: "hsl(271, 81%, 56%)",
+    APPROVED: "hsl(142, 71%, 45%)",
+    REJECTED: "hsl(0, 84%, 60%)",
+    REQUIRES_CORRECTION: "hsl(25, 95%, 53%)",
+};
+
+const chartConfig = {
+    count: { label: "Applications" },
+};
 
 import {
     Table,
@@ -125,6 +144,20 @@ export default function DashboardPage() {
         return acc;
     }, {} as Record<string, number>);
 
+    // Chart data
+    const statusChartData = STATUS_STATS
+        .map(({ status, label }) => ({ name: label, count: stats[status] || 0, fill: STATUS_CHART_COLORS[status] }))
+        .filter(d => d.count > 0);
+
+    const typeCountMap: Record<string, number> = {};
+    for (const app of applications) {
+        typeCountMap[app.permitType] = (typeCountMap[app.permitType] || 0) + 1;
+    }
+    const typeChartData = Object.entries(typeCountMap)
+        .sort((a, b) => b[1] - a[1])
+        .slice(0, 8)
+        .map(([name, count]) => ({ name, count }));
+
     if (status === "loading") return null;
 
     if (!session) {
@@ -152,7 +185,7 @@ export default function DashboardPage() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-5 gap-4">
+            <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-6 gap-4">
                 {STATUS_STATS.map(({ status, label, color }) => (
                     <Card key={status}>
                         <CardContent className="p-6">
@@ -167,6 +200,63 @@ export default function DashboardPage() {
                     </Card>
                 ))}
             </div>
+
+            {/* Charts */}
+            {!isLoading && applications.length > 0 && (
+                <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    {/* Status Breakdown */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>Status Breakdown</CardTitle>
+                            <CardDescription>Applications by current status</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ChartContainer config={chartConfig} className="h-[220px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <PieChart>
+                                        <Pie
+                                            data={statusChartData}
+                                            dataKey="count"
+                                            nameKey="name"
+                                            cx="50%"
+                                            cy="50%"
+                                            outerRadius={80}
+                                            label={({ name, count }) => `${name}: ${count}`}
+                                            labelLine={false}
+                                        >
+                                            {statusChartData.map((entry, i) => (
+                                                <Cell key={i} fill={entry.fill} />
+                                            ))}
+                                        </Pie>
+                                        <Tooltip content={<ChartTooltipContent />} />
+                                    </PieChart>
+                                </ResponsiveContainer>
+                            </ChartContainer>
+                        </CardContent>
+                    </Card>
+
+                    {/* By Permit Type */}
+                    <Card>
+                        <CardHeader>
+                            <CardTitle>By Permit Type</CardTitle>
+                            <CardDescription>Application count per permit type</CardDescription>
+                        </CardHeader>
+                        <CardContent>
+                            <ChartContainer config={chartConfig} className="h-[220px]">
+                                <ResponsiveContainer width="100%" height="100%">
+                                    <BarChart data={typeChartData} layout="vertical">
+                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
+                                        <XAxis type="number" tick={{ fontSize: 11 }} />
+                                        <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
+                                        <Tooltip content={<ChartTooltipContent />} />
+                                        <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                                    </BarChart>
+                                </ResponsiveContainer>
+                            </ChartContainer>
+                        </CardContent>
+                    </Card>
+                </div>
+            )}
 
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 {/* Recent Applications */}
