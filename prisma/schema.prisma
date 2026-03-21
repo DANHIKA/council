@@ -21,6 +21,16 @@ enum ApplicationStatus {
   APPROVED
   REJECTED
   REQUIRES_CORRECTION
+  PENDING_APPROVAL
+}
+
+enum Department {
+  BUILDING
+  BUSINESS
+  ENVIRONMENTAL
+  ROADS
+  EVENTS
+  GENERAL
 }
 
 enum DocumentStatus {
@@ -43,6 +53,7 @@ model PermitType {
   description  String?            @db.Text
   fee          Decimal            @default(0) @db.Decimal(10, 2)
   currency     String             @default("MWK")
+  department   Department         @default(GENERAL)
   createdAt    DateTime           @default(now())
   updatedAt    DateTime           @updatedAt
 
@@ -80,6 +91,7 @@ model User {
   role          UserRole  @default(APPLICANT)
   phone         String?
   organization  String?
+  department   Department @default(GENERAL)
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 
@@ -89,6 +101,7 @@ model User {
   reviews      PermitApplication[] @relation("OfficerReviews")
   comments     Comment[]
   notifications Notification[]
+  reviewTokens  ReviewToken[]
 }
 
 model Account {
@@ -154,6 +167,7 @@ model PermitApplication {
   timeline      TimelineEvent[]
   payment       Payment?
   paymentStatus PaymentStatus @default(PENDING)
+  reviewTokens  ReviewToken[]
 }
 
 model Document {
@@ -230,4 +244,17 @@ model Notification {
   read      Boolean  @default(false)
   link      String?
   createdAt DateTime @default(now())
+}
+
+model ReviewToken {
+  id            String   @id @default(cuid())
+  token         String   @unique @default(cuid())
+  applicationId String
+  application   PermitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
+  officerId     String
+  officer       User     @relation(fields: [officerId], references: [id], onDelete: Cascade)
+  action        String
+  used          Boolean  @default(false)
+  expiresAt     DateTime
+  createdAt     DateTime @default(now())
 }

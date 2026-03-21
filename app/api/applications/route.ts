@@ -2,6 +2,9 @@ import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { z } from "zod";
+import { createNotification } from "@/lib/notifications";
+import { sendEmail } from "@/lib/email";
+import { newApplicationEmail } from "@/lib/email-templates";
 
 const createApplicationSchema = z.object({
     permitTypeId: z.string().cuid(),
@@ -56,6 +59,63 @@ export async function POST(req: NextRequest) {
                 status: "SUBMITTED",
             },
         });
+
+        // Notify officers/admins by email + in-app
+        const officers = await prisma.user.findMany({
+            where: { role: { in: ["OFFICER", "ADMIN"] } },
+            select: { id: true, name: true, email: true },
+        });
+
+        const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000); // 48 hours
+
+        await Promise.all(
+            officers.map(async (officer) => {
+                // Create 3 tokens (one per action)
+                const [recommendToken, correctionsToken, rejectToken] = await Promise.all([
+                    prisma.reviewToken.create({
+                        data: { applicationId: application.id, officerId: officer.id, action: "RECOMMEND_APPROVAL", expiresAt },
+                    }),
+                    prisma.reviewToken.create({
+                        data: {
+                            applicationId: application.id,
+                            officerId: officer.id,
+                            action: "REQUIRES_CORRECTION",
+                            expiresAt,
+                        },
+                    }),
+                    prisma.reviewToken.create({
+                        data: { applicationId: application.id, officerId: officer.id, action: "REJECT", expiresAt },
+                    }),
+                ]);
+
+                // In-app notification
+                await createNotification({
+                    userId: officer.id,
+                    title: "New Application Submitted",
+                    message: `A new ${permitType.name} application from ${application.applicant.name} is awaiting review.`,
+                    type: "INFO",
+                    link: `/officer/review/${application.id}`,
+                });
+
+                // Email
+                await sendEmail({
+                    to: officer.email,
+                    subject: `New Application for Review: ${permitType.name}`,
+                    html: newApplicationEmail({
+                        officerName: officer.name || "Officer",
+                        applicantName: application.applicant.name || "Applicant",
+                        applicantEmail: application.applicant.email,
+                        permitType: permitType.name,
+                        description: application.description,
+                        location: application.location,
+                        applicationId: application.id,
+                        recommendToken: recommendToken.token,
+                        correctionsToken: correctionsToken.token,
+                        rejectToken: rejectToken.token,
+                    }),
+                });
+            })
+        );
 
         return NextResponse.json({ application }, { status: 201 });
     } catch (error) {

@@ -21,6 +21,9 @@ export const PERMISSIONS = {
     add_internal_comment:     ["OFFICER", "ADMIN"],
     review_application:       ["OFFICER", "ADMIN"],
 
+    sign_application:         ["ADMIN"],
+    recommend_application:    ["OFFICER", "ADMIN"],
+
     // Administration
     manage_users:             ["ADMIN"],
     change_user_roles:        ["ADMIN"],

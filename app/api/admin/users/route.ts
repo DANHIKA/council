@@ -30,6 +30,7 @@ export async function GET(req: NextRequest) {
                 name: true,
                 email: true,
                 role: true,
+                department: true,
                 createdAt: true,
                 _count: {
                     select: { applications: true },

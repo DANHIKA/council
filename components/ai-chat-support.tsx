@@ -1,4 +1,4 @@
-"use client";
+ "use client";
 
 import { useState, useRef, useEffect, useCallback } from "react";
 import { Button } from "@/components/ui/button";
@@ -109,7 +109,13 @@ export function AIChatSupport() {
     // ─────────────────────────────────────────────────────────────────────
 
     const userRole = (session?.user as any)?.role;
-    if (userRole === "OFFICER" || userRole === "ADMIN") return null;
+    const isStaff = userRole === "OFFICER" || userRole === "ADMIN";
+    const chatEndpoint = isStaff ? "/api/ai/staff-chat" : "/api/ai/chat";
+    const chatTitle = isStaff ? "Staff Assistant" : "Council Assistant";
+    const chatDescription = isStaff
+        ? "Ask me about applications, stats, workload, or anything in the queue."
+        : "Ask me anything about your permit application.";
+    const chatPlaceholder = isStaff ? "e.g. How many pending sign-offs?" : "Ask a question...";
 
     const agentState: AgentState =
         chatStatus === "thinking"
@@ -144,7 +150,7 @@ export function AIChatSupport() {
         ]);
 
         try {
-            const res = await fetch("/api/ai/chat", {
+            const res = await fetch(chatEndpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({ messages: history }),
@@ -188,7 +194,7 @@ export function AIChatSupport() {
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <HugeiconsIcon icon={SparklesIcon} className="h-5 w-5 shrink-0" />
                                 <SheetTitle className="text-sm font-bold text-primary-foreground m-0">
-                                    Council Assistant
+                                    {chatTitle}
                                 </SheetTitle>
                                 {chatStatus !== "idle" && (
                                     <BarVisualizer
@@ -215,8 +221,8 @@ export function AIChatSupport() {
                                                 className="h-10 w-10 opacity-20"
                                             />
                                         }
-                                        title="Council Assistant"
-                                        description="Ask me anything about your permit application."
+                                        title={chatTitle}
+                                        description={chatDescription}
                                     />
                                 ) : (
                                     messages.map((m, i) =>
@@ -292,7 +298,7 @@ export function AIChatSupport() {
                                     )}
                                     <InputGroupInput
                                         placeholder={
-                                            mic.isListening ? "Listening..." : "Ask a question..."
+                                            mic.isListening ? "Listening..." : chatPlaceholder
                                         }
                                         value={input}
                                         onChange={(e) => setInput(e.target.value)}

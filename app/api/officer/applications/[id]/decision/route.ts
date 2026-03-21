@@ -3,6 +3,8 @@ import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
+import { sendEmail } from "@/lib/email";
+import { pendingSignoffEmail, decisionEmail } from "@/lib/email-templates";
 
 const decisionSchema = z.object({
     decision: z.enum(["APPROVE", "REJECT", "REQUIRES_CORRECTION"]),
@@ -61,11 +63,11 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             });
         }
 
-        let nextStatus: "APPROVED" | "REJECTED" | "REQUIRES_CORRECTION";
+        let nextStatus: "PENDING_APPROVAL" | "REJECTED" | "REQUIRES_CORRECTION";
         let event: string;
         if (parsed.decision === "APPROVE") {
-            nextStatus = "APPROVED";
-            event = "Application Approved";
+            nextStatus = "PENDING_APPROVAL";
+            event = "Approval Recommended";
         } else if (parsed.decision === "REJECT") {
             nextStatus = "REJECTED";
             event = "Application Rejected";
@@ -78,7 +80,6 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             where: { id },
             data: {
                 status: nextStatus,
-                approvedAt: parsed.decision === "APPROVE" ? new Date() : null,
             },
             include: {
                 applicant: { select: { id: true, name: true, email: true } },
@@ -114,51 +115,73 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             },
         });
 
-        // Trigger Notification
-        await createNotification({
-            userId: application.applicant.id,
-            title: event,
-            message: `Your application for ${application.permitTypeRef?.name || application.permitType} has been updated to: ${nextStatus}. ${parsed.notes ? `Notes: ${parsed.notes}` : ""}`,
-            type: nextStatus === "APPROVED" ? "SUCCESS" : nextStatus === "REJECTED" ? "ERROR" : "WARNING",
-            link: `/applications/${id}`,
-        });
-
-        // Option A: auto-generate certificate on approval
+        // On recommendation, notify all admins for sign-off
         if (parsed.decision === "APPROVE") {
-            const existing = await prisma.certificate.findUnique({
-                where: { applicationId: id },
+            const admins = await prisma.user.findMany({
+                where: { role: "ADMIN" },
+                select: { id: true, name: true, email: true },
             });
 
-            if (!existing) {
-                const issueDate = new Date();
-                const expiryDate = new Date(issueDate);
-                expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+            const expiresAt = new Date(Date.now() + 48 * 60 * 60 * 1000);
 
-                const certificateNo = generateCertificateNo(id);
-
-                await prisma.certificate.create({
-                    data: {
-                        applicationId: id,
-                        certificateNo,
-                        qrCode: JSON.stringify({
-                            certificateNo,
-                            applicationId: id,
-                            issuedAt: issueDate.toISOString(),
+            await Promise.all(
+                admins.map(async (admin) => {
+                    const [approveToken, rejectToken] = await Promise.all([
+                        prisma.reviewToken.create({
+                            data: { applicationId: id, officerId: admin.id, action: "FINAL_APPROVE", expiresAt },
                         }),
-                        issueDate,
-                        expiryDate,
-                    },
-                });
+                        prisma.reviewToken.create({
+                            data: { applicationId: id, officerId: admin.id, action: "FINAL_REJECT", expiresAt },
+                        }),
+                    ]);
 
-                await prisma.timelineEvent.create({
-                    data: {
-                        applicationId: id,
-                        event: "Certificate Generated",
-                        description: `Certificate ${certificateNo} generated automatically on approval.`,
-                        status: "APPROVED",
-                    },
-                });
-            }
+                    await createNotification({
+                        userId: admin.id,
+                        title: "Application Pending Sign-off",
+                        message: `Officer ${(session.user as any).name || "Officer"} has recommended approval for a ${application.permitTypeRef?.name || application.permitType} application.`,
+                        type: "INFO",
+                        link: `/officer/review/${id}`,
+                    });
+
+                    await sendEmail({
+                        to: admin.email,
+                        subject: `Sign-off Required: ${application.permitTypeRef?.name || application.permitType}`,
+                        html: pendingSignoffEmail({
+                            adminName: admin.name || "Admin",
+                            officerName: (session.user as any).name || "Officer",
+                            applicantName: application.applicant.name || "Applicant",
+                            applicantEmail: application.applicant.email,
+                            permitType: application.permitTypeRef?.name || application.permitType,
+                            description: application.description,
+                            location: application.location,
+                            applicationId: id,
+                            approveToken: approveToken.token,
+                            rejectToken: rejectToken.token,
+                        }),
+                    });
+                })
+            );
+        } else {
+            // For reject/corrections, notify the applicant
+            await createNotification({
+                userId: application.applicant.id,
+                title: event,
+                message: `Your application for ${application.permitTypeRef?.name || application.permitType} has been updated. ${parsed.notes ? `Notes: ${parsed.notes}` : ""}`,
+                type: nextStatus === "REJECTED" ? "ERROR" : "WARNING",
+                link: `/applications/${id}`,
+            });
+
+            await sendEmail({
+                to: application.applicant.email,
+                subject: `Application ${nextStatus === "REJECTED" ? "Rejected" : "Requires Corrections"} — ${application.permitTypeRef?.name || application.permitType}`,
+                html: decisionEmail({
+                    applicantName: application.applicant.name || "Applicant",
+                    permitType: application.permitTypeRef?.name || application.permitType,
+                    decision: nextStatus as "REJECTED" | "REQUIRES_CORRECTION",
+                    notes: parsed.notes,
+                    applicationId: id,
+                }),
+            });
         }
 
         const finalApp = await prisma.permitApplication.findUnique({

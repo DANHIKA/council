@@ -8,6 +8,7 @@ const updateProfileSchema = z.object({
     phone: z.string().optional(),
     organization: z.string().optional(),
     image: z.string().optional(),
+    department: z.enum(["BUILDING", "BUSINESS", "ENVIRONMENTAL", "ROADS", "EVENTS", "GENERAL"]).optional(),
 });
 
 export async function GET(req: NextRequest) {
@@ -26,6 +27,7 @@ export async function GET(req: NextRequest) {
                 role: true,
                 phone: true,
                 organization: true,
+                department: true,
                 image: true,
                 createdAt: true,
             },
@@ -59,6 +61,7 @@ export async function PATCH(req: NextRequest) {
                 phone: validated.phone,
                 organization: validated.organization,
                 ...(validated.image !== undefined && { image: validated.image }),
+                ...(validated.department && { department: validated.department }),
             },
             select: {
                 id: true,
@@ -67,6 +70,7 @@ export async function PATCH(req: NextRequest) {
                 role: true,
                 phone: true,
                 organization: true,
+                department: true,
                 image: true,
             },
         });

@@ -5,7 +5,7 @@ import { useSession, signOut } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
-import { Avatar, AvatarFallback } from "@/components/ui/avatar";
+import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
     DropdownMenu,
     DropdownMenuContent,
@@ -174,6 +174,7 @@ export function NavigationHeader() {
                                 render={
                                     <Button variant="ghost" className="flex items-center space-x-2 h-auto p-2">
                                         <Avatar className="h-8 w-8">
+                                            <AvatarImage src={session.user?.image || ""} alt={userName} />
                                             <AvatarFallback className="text-xs">{initials}</AvatarFallback>
                                         </Avatar>
                                         <div className="hidden sm:flex flex-col items-start text-left">

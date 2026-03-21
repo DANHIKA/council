@@ -24,6 +24,8 @@ export function getStatusLabel(status: string) {
       return "Rejected";
     case "REQUIRES_CORRECTION":
       return "Requires Correction";
+    case "PENDING_APPROVAL":
+      return "Pending Sign-off";
     default:
       return status;
   }
@@ -41,6 +43,8 @@ export function getStatusColor(status: string) {
       return "bg-red-100 text-red-800 border-red-200 hover:bg-red-100";
     case "REQUIRES_CORRECTION":
       return "bg-orange-100 text-orange-800 border-orange-200 hover:bg-orange-100";
+    case "PENDING_APPROVAL":
+      return "bg-purple-100 text-purple-800 border-purple-200 hover:bg-purple-100";
     default:
       return "bg-gray-100 text-gray-800 border-gray-200 hover:bg-gray-100";
   }

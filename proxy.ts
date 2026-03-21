@@ -5,7 +5,7 @@ import { canAccessRoute } from "@/lib/rbac";
 import type { UserRole } from "@/lib/types";
 
 // Routes that are publicly accessible (no auth required)
-const PUBLIC_ROUTES = ["/auth/login", "/auth/error", "/api/auth"];
+const PUBLIC_ROUTES = ["/auth/login", "/auth/register", "/auth/error", "/api/auth", "/email-action", "/api/email-action"];
 
 export async function proxy(request: NextRequest) {
     const { pathname } = request.nextUrl;

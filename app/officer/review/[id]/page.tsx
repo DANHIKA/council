@@ -30,6 +30,7 @@ const TIMELINE_COLORS: Record<string, string> = {
     UNDER_REVIEW: "bg-yellow-500",
     REQUIRES_CORRECTION: "bg-orange-500",
     SUBMITTED: "bg-blue-500",
+    PENDING_APPROVAL: "bg-purple-500",
 };
 
 export default function OfficerReviewPage({ params }: { params: Promise<{ id: string }> }) {
@@ -155,7 +156,7 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
     const canDecide =
         application.officer?.id === (session?.user as any)?.id || isAdmin;
     const isAssigned = !!application.officer;
-    const isFinal = ["APPROVED", "REJECTED"].includes(application.status);
+    const isFinal = ["APPROVED", "REJECTED", "PENDING_APPROVAL"].includes(application.status);
     const isAwaitingCorrections = application.status === "REQUIRES_CORRECTION";
 
     // Last public comment (officer notes to applicant)
@@ -372,7 +373,7 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
                                 <CardDescription>
                                     {isAwaitingCorrections
                                         ? "Applicant has resubmitted — make a new decision"
-                                        : "Submit your decision for this application"}
+                                        : "Submit your recommendation. Approvals require admin sign-off."}
                                 </CardDescription>
                             </CardHeader>
                             <CardContent className="space-y-4">
@@ -407,10 +408,10 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
                                     <Button
                                         onClick={() => handleDecision("APPROVE")}
                                         disabled={!canDecide || isSubmitting}
-                                        className="w-full bg-green-600 hover:bg-green-700"
+                                        className="w-full bg-purple-600 hover:bg-purple-700"
                                     >
                                         <CheckCircle2 className="h-4 w-4 mr-2" />
-                                        Approve
+                                        Recommend Approval
                                     </Button>
                                     <Button
                                         onClick={() => handleDecision("REQUIRES_CORRECTION")}

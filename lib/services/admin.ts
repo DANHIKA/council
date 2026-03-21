@@ -5,6 +5,7 @@ export interface AdminUser {
     name: string;
     email: string;
     role: "APPLICANT" | "OFFICER" | "ADMIN";
+    department?: string;
     createdAt: string;
     _count: {
         applications: number;

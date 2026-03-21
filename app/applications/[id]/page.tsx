@@ -22,8 +22,11 @@ import type { Application } from "@/lib/types";
 function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }> }) {
     const { data: session, status } = useSession();
     const router = useRouter();
+    const searchParams = useSearchParams();
+    const { isStaff } = usePermissions();
     const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
     const [commentText, setCommentText] = useState("");
+    const [editSheetOpen, setEditSheetOpen] = useState(false);
 
     const { data: application, isLoading, error } = useApplication(resolvedParams?.id || "");
 
@@ -44,6 +47,28 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
             setResolvedParams(p);
         })();
     }, [status, session, router, params]);
+
+    // Open edit sheet when redirected from /edit page
+    useEffect(() => {
+        if (searchParams.get("edit") === "1") {
+            setEditSheetOpen(true);
+            const url = new URL(window.location.href);
+            url.searchParams.delete("edit");
+            window.history.replaceState({}, "", url.toString());
+        }
+    }, [searchParams]);
+
+    // Show payment result toast after redirect from Paychangu
+    useEffect(() => {
+        const paymentParam = searchParams.get("payment");
+        if (!paymentParam) return;
+        if (paymentParam === "success") toast.success("Payment confirmed! Your application is now being processed.");
+        else if (paymentParam === "failed") toast.error("Payment failed. Please try again.");
+        else if (paymentParam === "cancelled") toast.info("Payment was cancelled.");
+        const url = new URL(window.location.href);
+        url.searchParams.delete("payment");
+        window.history.replaceState({}, "", url.toString());
+    }, [searchParams]);
 
     if (status === "loading" || !resolvedParams) return null;
     if (!session) {
@@ -70,32 +95,7 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
         );
     }
 
-    const { isStaff } = usePermissions();
-    const searchParams = useSearchParams();
     const isOwner = application.applicant.id === (session?.user as any)?.id;
-    const [editSheetOpen, setEditSheetOpen] = useState(false);
-
-    // Open edit sheet when redirected from /edit page
-    useEffect(() => {
-        if (searchParams.get("edit") === "1") {
-            setEditSheetOpen(true);
-            const url = new URL(window.location.href);
-            url.searchParams.delete("edit");
-            window.history.replaceState({}, "", url.toString());
-        }
-    }, [searchParams]);
-
-    // Show payment result toast after redirect from Paychangu
-    useEffect(() => {
-        const paymentParam = searchParams.get("payment");
-        if (!paymentParam) return;
-        if (paymentParam === "success") toast.success("Payment confirmed! Your application is now being processed.");
-        else if (paymentParam === "failed") toast.error("Payment failed. Please try again.");
-        else if (paymentParam === "cancelled") toast.info("Payment was cancelled.");
-        const url = new URL(window.location.href);
-        url.searchParams.delete("payment");
-        window.history.replaceState({}, "", url.toString());
-    }, [searchParams]);
 
     const handleDeleteDocument = async (documentId: string) => {
         try {
@@ -123,7 +123,6 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
     const handleDownloadCertificate = async () => {
         try {
             const result = await downloadCertificateMutation.mutateAsync(application.id);
-            // Create blob and download
             const blob = new Blob([result as any], { type: "application/pdf" });
             const url = window.URL.createObjectURL(blob);
             const a = document.createElement("a");
@@ -200,8 +199,8 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
                                             key={doc.id}
                                             file={doc}
                                             showStatus={true}
-                                            onDelete={isOwner && application.status !== "APPROVED" && application.status !== "REJECTED" 
-                                                ? () => handleDeleteDocument(doc.id) 
+                                            onDelete={isOwner && application.status !== "APPROVED" && application.status !== "REJECTED"
+                                                ? () => handleDeleteDocument(doc.id)
                                                 : undefined}
                                         />
                                     ))}
@@ -269,7 +268,6 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
                 </div>
 
                 <div className="space-y-6">
-                    {/* Payment card — shown to the owner when fee is pending or failed */}
                     {isOwner && application.permitTypeRef && Number(application.permitTypeRef.fee ?? 0) > 0 && (
                         <PaymentCard
                             applicationId={application.id}

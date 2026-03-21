@@ -4,6 +4,7 @@ import { useState, useEffect } from "react";
 import { useSession } from "next-auth/react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from "@/components/ui/card";
+import { Button } from "@/components/ui/button";
 import {
     Table,
     TableBody,
@@ -19,11 +20,13 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Users, Shield, FileText } from "lucide-react";
+import { Loader2, Users, Shield, FileText, CheckCircle2, XCircle } from "lucide-react";
 import { toast } from "sonner";
-import { formatDateTime } from "@/lib/utils";
+import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { adminApi, type AdminUser } from "@/lib/services/admin";
 import { usePermissions } from "@/hooks/usePermissions";
+import { Badge } from "@/components/ui/badge";
+import { useAdminSignoffQueue, useAdminSignoff } from "@/lib/queries";
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
 import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
 
@@ -34,8 +37,15 @@ export default function AdminPage() {
     const router = useRouter();
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
+    const [signoffNotes, setSignoffNotes] = useState<Record<string, string>>({});
 
     const { isAdmin } = usePermissions();
+
+    const { data: signoffData, isLoading: signoffLoading } = useAdminSignoffQueue();
+    const signoffMutation = useAdminSignoff();
+
+    const pendingApps = signoffData?.data || [];
+    const pendingCount = signoffData?.pagination?.total || 0;
 
     useEffect(() => {
         if (status === "loading") return;
@@ -163,6 +173,93 @@ export default function AdminPage() {
                 </Card>
             </div>
 
+            {/* Pending Sign-off Queue */}
+            <Card>
+                <CardHeader>
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <CardTitle className="flex items-center gap-2">
+                                Pending Sign-off
+                                {pendingCount > 0 && (
+                                    <span className="inline-flex items-center justify-center h-5 w-5 rounded-full bg-purple-600 text-white text-xs font-bold">{pendingCount}</span>
+                                )}
+                            </CardTitle>
+                            <CardDescription>Applications recommended by officers awaiting your final decision</CardDescription>
+                        </div>
+                    </div>
+                </CardHeader>
+                <CardContent>
+                    {signoffLoading ? (
+                        <div className="flex items-center gap-2 py-4 text-muted-foreground">
+                            <Loader2 className="h-4 w-4 animate-spin" />
+                            <span className="text-sm">Loading...</span>
+                        </div>
+                    ) : pendingApps.length === 0 ? (
+                        <p className="text-muted-foreground text-sm text-center py-6">No applications pending sign-off</p>
+                    ) : (
+                        <div className="space-y-4">
+                            {pendingApps.map((app: any) => (
+                                <div key={app.id} className="border rounded-lg p-4 space-y-3">
+                                    <div className="flex items-start justify-between gap-4">
+                                        <div className="space-y-1 min-w-0">
+                                            <p className="font-medium text-sm">{app.permitType}</p>
+                                            <p className="text-xs text-muted-foreground">{app.applicant?.name} · {app.location}</p>
+                                            {app.officer && (
+                                                <p className="text-xs text-muted-foreground">Recommended by: {app.officer.name}</p>
+                                            )}
+                                            <p className="text-xs text-muted-foreground">{formatDateTime(app.updatedAt)}</p>
+                                        </div>
+                                        <Badge className={getStatusColor(app.status)}>{getStatusLabel(app.status)}</Badge>
+                                    </div>
+                                    <div className="space-y-2">
+                                        <input
+                                            type="text"
+                                            placeholder="Sign-off notes (optional)"
+                                            value={signoffNotes[app.id] || ""}
+                                            onChange={e => setSignoffNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
+                                            className="w-full px-3 py-1.5 text-sm border rounded-md bg-background"
+                                        />
+                                        <div className="flex gap-2">
+                                            <Button
+                                                size="sm"
+                                                className="flex-1 bg-green-600 hover:bg-green-700"
+                                                disabled={signoffMutation.isPending}
+                                                onClick={async () => {
+                                                    try {
+                                                        await signoffMutation.mutateAsync({ id: app.id, decision: "APPROVE", notes: signoffNotes[app.id] });
+                                                        toast.success("Application approved");
+                                                        setSignoffNotes(prev => { const n = {...prev}; delete n[app.id]; return n; });
+                                                    } catch { toast.error("Failed to approve"); }
+                                                }}
+                                            >
+                                                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                                Final Approve
+                                            </Button>
+                                            <Button
+                                                size="sm"
+                                                variant="destructive"
+                                                className="flex-1"
+                                                disabled={signoffMutation.isPending}
+                                                onClick={async () => {
+                                                    try {
+                                                        await signoffMutation.mutateAsync({ id: app.id, decision: "REJECT", notes: signoffNotes[app.id] });
+                                                        toast.success("Application rejected");
+                                                        setSignoffNotes(prev => { const n = {...prev}; delete n[app.id]; return n; });
+                                                    } catch { toast.error("Failed to reject"); }
+                                                }}
+                                            >
+                                                <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                                Reject
+                                            </Button>
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
+                        </div>
+                    )}
+                </CardContent>
+            </Card>
+
             {/* Charts */}
             <div className="grid gap-6 md:grid-cols-2">
                 {/* User Distribution Pie Chart */}
@@ -244,6 +341,7 @@ export default function AdminPage() {
                                 <TableHead>Name</TableHead>
                                 <TableHead>Email</TableHead>
                                 <TableHead>Role</TableHead>
+                                <TableHead>Department</TableHead>
                                 <TableHead>Joined</TableHead>
                                 <TableHead className="text-right">Applications</TableHead>
                             </TableRow>
@@ -271,6 +369,7 @@ export default function AdminPage() {
                                             </SelectContent>
                                         </Select>
                                     </TableCell>
+                                    <TableCell className="text-sm capitalize">{user.department?.toLowerCase().replace('_', ' ') || 'General'}</TableCell>
                                     <TableCell>{formatDateTime(user.createdAt)}</TableCell>
                                     <TableCell className="text-right">
                                         {user._count.applications}
