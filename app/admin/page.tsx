@@ -27,10 +27,6 @@ import { adminApi, type AdminUser } from "@/lib/services/admin";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { useAdminSignoffQueue, useAdminSignoff } from "@/lib/queries";
-import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, PieChart, Pie, Cell } from "recharts";
-import { ChartContainer, ChartTooltipContent } from "@/components/ui/chart";
-
-const CHART_COLORS = ["#22c55e", "#3b82f6", "#ef4444", "#f59e0b"];
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -38,6 +34,7 @@ export default function AdminPage() {
     const [users, setUsers] = useState<AdminUser[]>([]);
     const [loading, setLoading] = useState(true);
     const [signoffNotes, setSignoffNotes] = useState<Record<string, string>>({});
+    const [confirming, setConfirming] = useState<{ id: string; decision: "APPROVE" | "REJECT" } | null>(null);
 
     const { isAdmin } = usePermissions();
 
@@ -103,28 +100,6 @@ export default function AdminPage() {
     const totalOfficers = users.filter(u => u.role === "OFFICER").length;
     const totalAdmins = users.filter(u => u.role === "ADMIN").length;
     const totalApplicants = users.filter(u => u.role === "APPLICANT").length;
-
-    // Chart data
-    const userDistribution = [
-        { name: "Applicants", value: totalApplicants, fill: CHART_COLORS[0] },
-        { name: "Officers", value: totalOfficers, fill: CHART_COLORS[1] },
-        { name: "Admins", value: totalAdmins, fill: CHART_COLORS[2] },
-    ];
-
-    const applicationsPerUser = users
-        .filter(u => u._count.applications > 0)
-        .slice(0, 10)
-        .map(u => ({
-            name: u.name?.split(" ")[0] || "Unknown",
-            applications: u._count.applications,
-        }));
-
-    const chartConfig = {
-        applicants: { label: "Applicants", color: CHART_COLORS[0] },
-        officers: { label: "Officers", color: CHART_COLORS[1] },
-        admins: { label: "Admins", color: CHART_COLORS[2] },
-        applications: { label: "Applications", color: CHART_COLORS[3] },
-    };
 
     return (
         <div className="container mx-auto py-8 max-w-7xl space-y-8">
@@ -197,136 +172,104 @@ export default function AdminPage() {
                     ) : pendingApps.length === 0 ? (
                         <p className="text-muted-foreground text-sm text-center py-6">No applications pending sign-off</p>
                     ) : (
-                        <div className="space-y-4">
-                            {pendingApps.map((app: any) => (
-                                <div key={app.id} className="border rounded-lg p-4 space-y-3">
-                                    <div className="flex items-start justify-between gap-4">
-                                        <div className="space-y-1 min-w-0">
-                                            <p className="font-medium text-sm">{app.permitType}</p>
-                                            <p className="text-xs text-muted-foreground">{app.applicant?.name} · {app.location}</p>
-                                            {app.officer && (
-                                                <p className="text-xs text-muted-foreground">Recommended by: {app.officer.name}</p>
+                        <div className="space-y-3">
+                            {pendingApps.map((app: any) => {
+                                const isConfirming = confirming?.id === app.id;
+                                return (
+                                    <div key={app.id} className="border rounded-lg p-4">
+                                        <div className="flex items-start justify-between gap-4">
+                                            <div className="space-y-0.5 min-w-0">
+                                                <p className="font-medium text-sm">{app.permitType}</p>
+                                                <p className="text-xs text-muted-foreground">
+                                                    {app.applicant?.name} · {app.location}
+                                                </p>
+                                                {app.officer && (
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Recommended by {app.officer.name}
+                                                    </p>
+                                                )}
+                                            </div>
+                                            {!isConfirming && (
+                                                <div className="flex gap-2 shrink-0">
+                                                    <Button
+                                                        size="sm"
+                                                        className="bg-green-600 hover:bg-green-700 h-8"
+                                                        onClick={() => setConfirming({ id: app.id, decision: "APPROVE" })}
+                                                    >
+                                                        <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
+                                                        Approve
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="destructive"
+                                                        className="h-8"
+                                                        onClick={() => setConfirming({ id: app.id, decision: "REJECT" })}
+                                                    >
+                                                        <XCircle className="h-3.5 w-3.5 mr-1.5" />
+                                                        Reject
+                                                    </Button>
+                                                </div>
                                             )}
-                                            <p className="text-xs text-muted-foreground">{formatDateTime(app.updatedAt)}</p>
                                         </div>
-                                        <Badge className={getStatusColor(app.status)}>{getStatusLabel(app.status)}</Badge>
+
+                                        {confirming?.id === app.id && confirming && (
+                                            <div className="mt-3 pt-3 border-t space-y-2">
+                                                <p className="text-xs font-medium text-muted-foreground">
+                                                    {confirming.decision === "APPROVE" ? "Confirm approval" : "Confirm rejection"}
+                                                </p>
+                                                <input
+                                                    type="text"
+                                                    placeholder="Add a note (optional)"
+                                                    value={signoffNotes[app.id] || ""}
+                                                    onChange={e => setSignoffNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
+                                                    className="w-full px-3 py-1.5 text-sm border rounded-md bg-background"
+                                                    autoFocus
+                                                />
+                                                <div className="flex gap-2">
+                                                    {(() => {
+                                                        const c = confirming;
+                                                        return (
+                                                    <Button
+                                                        size="sm"
+                                                        className={c.decision === "APPROVE" ? "bg-green-600 hover:bg-green-700" : ""}
+                                                        variant={c.decision === "REJECT" ? "destructive" : "default"}
+                                                        disabled={signoffMutation.isPending}
+                                                        onClick={async () => {
+                                                            try {
+                                                                await signoffMutation.mutateAsync({ id: app.id, decision: c.decision, notes: signoffNotes[app.id] });
+                                                                toast.success(c.decision === "APPROVE" ? "Application approved" : "Application rejected");
+                                                                setConfirming(null);
+                                                                setSignoffNotes(prev => { const n = { ...prev }; delete n[app.id]; return n; });
+                                                            } catch { toast.error("Action failed"); }
+                                                        }}
+                                                    >
+                                                        {signoffMutation.isPending ? (
+                                                            <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                        ) : c.decision === "APPROVE" ? (
+                                                            "Confirm Approval"
+                                                        ) : (
+                                                            "Confirm Rejection"
+                                                        )}
+                                                    </Button>
+                                                        );
+                                                    })()}
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={() => setConfirming(null)}
+                                                    >
+                                                        Cancel
+                                                    </Button>
+                                                </div>
+                                            </div>
+                                        )}
                                     </div>
-                                    <div className="space-y-2">
-                                        <input
-                                            type="text"
-                                            placeholder="Sign-off notes (optional)"
-                                            value={signoffNotes[app.id] || ""}
-                                            onChange={e => setSignoffNotes(prev => ({ ...prev, [app.id]: e.target.value }))}
-                                            className="w-full px-3 py-1.5 text-sm border rounded-md bg-background"
-                                        />
-                                        <div className="flex gap-2">
-                                            <Button
-                                                size="sm"
-                                                className="flex-1 bg-green-600 hover:bg-green-700"
-                                                disabled={signoffMutation.isPending}
-                                                onClick={async () => {
-                                                    try {
-                                                        await signoffMutation.mutateAsync({ id: app.id, decision: "APPROVE", notes: signoffNotes[app.id] });
-                                                        toast.success("Application approved");
-                                                        setSignoffNotes(prev => { const n = {...prev}; delete n[app.id]; return n; });
-                                                    } catch { toast.error("Failed to approve"); }
-                                                }}
-                                            >
-                                                <CheckCircle2 className="h-3.5 w-3.5 mr-1.5" />
-                                                Final Approve
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="destructive"
-                                                className="flex-1"
-                                                disabled={signoffMutation.isPending}
-                                                onClick={async () => {
-                                                    try {
-                                                        await signoffMutation.mutateAsync({ id: app.id, decision: "REJECT", notes: signoffNotes[app.id] });
-                                                        toast.success("Application rejected");
-                                                        setSignoffNotes(prev => { const n = {...prev}; delete n[app.id]; return n; });
-                                                    } catch { toast.error("Failed to reject"); }
-                                                }}
-                                            >
-                                                <XCircle className="h-3.5 w-3.5 mr-1.5" />
-                                                Reject
-                                            </Button>
-                                        </div>
-                                    </div>
-                                </div>
-                            ))}
+                                );
+                            })}
                         </div>
                     )}
                 </CardContent>
             </Card>
-
-            {/* Charts */}
-            <div className="grid gap-6 md:grid-cols-2">
-                {/* User Distribution Pie Chart */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>User Distribution</CardTitle>
-                        <CardDescription>Breakdown of users by role</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        <ChartContainer config={chartConfig} className="h-[250px]">
-                            <ResponsiveContainer width="100%" height="100%">
-                                <PieChart>
-                                    <Pie
-                                        data={userDistribution}
-                                        cx="50%"
-                                        cy="50%"
-                                        innerRadius={60}
-                                        outerRadius={80}
-                                        paddingAngle={5}
-                                        dataKey="value"
-                                    >
-                                        {userDistribution.map((entry, index) => (
-                                            <Cell key={`cell-${index}`} fill={entry.fill} />
-                                        ))}
-                                    </Pie>
-                                    <Tooltip content={<ChartTooltipContent />} />
-                                </PieChart>
-                            </ResponsiveContainer>
-                        </ChartContainer>
-                        <div className="flex justify-center gap-4 mt-4">
-                            {userDistribution.map((item) => (
-                                <div key={item.name} className="flex items-center gap-2">
-                                    <div className="w-3 h-3 rounded-full" style={{ backgroundColor: item.fill }} />
-                                    <span className="text-sm text-muted-foreground">{item.name}: {item.value}</span>
-                                </div>
-                            ))}
-                        </div>
-                    </CardContent>
-                </Card>
-
-                {/* Applications per User Bar Chart */}
-                <Card>
-                    <CardHeader>
-                        <CardTitle>Top Users by Applications</CardTitle>
-                        <CardDescription>Most active applicants</CardDescription>
-                    </CardHeader>
-                    <CardContent>
-                        {applicationsPerUser.length === 0 ? (
-                            <div className="h-[250px] flex items-center justify-center text-muted-foreground">
-                                No applications yet
-                            </div>
-                        ) : (
-                            <ChartContainer config={chartConfig} className="h-[250px]">
-                                <ResponsiveContainer width="100%" height="100%">
-                                    <BarChart data={applicationsPerUser} layout="vertical">
-                                        <CartesianGrid strokeDasharray="3 3" horizontal={false} />
-                                        <XAxis type="number" allowDecimals={false} />
-                                        <YAxis dataKey="name" type="category" width={80} />
-                                        <Tooltip content={<ChartTooltipContent />} />
-                                        <Bar dataKey="applications" fill="var(--color-applications)" radius={4} />
-                                    </BarChart>
-                                </ResponsiveContainer>
-                            </ChartContainer>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
 
             {/* User Management Table */}
             <Card>

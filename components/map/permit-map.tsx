@@ -5,7 +5,6 @@ import Link from "next/link";
 import type { MapMouseEvent } from "maplibre-gl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
-import { Input } from "@/components/ui/input";
 import {
     Map,
     useMap,
@@ -16,7 +15,7 @@ import {
 } from "@/components/ui/map";
 import { getStatusColor, getStatusLabel } from "@/lib/utils";
 import type { Application } from "@/lib/types";
-import { Search, Loader2, Ruler, RotateCcw, Pentagon, MapPin } from "lucide-react";
+import { Ruler, RotateCcw, Pentagon, MapPin } from "lucide-react";
 
 // MapLibre uses [longitude, latitude] — opposite of Leaflet!
 const DEFAULT_CENTER: [number, number] = [28.0473, -26.2041]; // Johannesburg
@@ -46,22 +45,6 @@ const STATUS_COLORS: Record<string, string> = {
 
 function getStatusColorHex(status: string): string {
     return STATUS_COLORS[status] ?? "#3b82f6";
-}
-
-async function geocodeAddress(address: string): Promise<[number, number] | null> {
-    try {
-        const res = await fetch(
-            `https://nominatim.openstreetmap.org/search?format=json&q=${encodeURIComponent(address)}&limit=1`,
-            { headers: { "User-Agent": "CouncilPermitPortal/1.0" } }
-        );
-        const data = await res.json();
-        if (data?.length > 0) {
-            return [parseFloat(data[0].lon), parseFloat(data[0].lat)];
-        }
-        return null;
-    } catch {
-        return null;
-    }
 }
 
 function haversineDistance(
@@ -111,7 +94,6 @@ function formatArea(m2: number): string {
 // ─── Inner component (must be child of <Map> to use useMap) ──────────────────
 
 interface MapInteractionsProps {
-    flyTo: { center: [number, number]; zoom: number } | null;
     mapStyle: MapStyleKey;
     measureMode: boolean;
     drawMode: boolean;
@@ -124,7 +106,6 @@ interface MapInteractionsProps {
 }
 
 function MapInteractions({
-    flyTo,
     mapStyle,
     measureMode,
     drawMode,
@@ -136,7 +117,6 @@ function MapInteractions({
     measurePoints,
 }: MapInteractionsProps) {
     const { map } = useMap();
-    const prevFlyToRef = useRef<typeof flyTo>(null);
     const prevStyleRef = useRef<MapStyleKey>("street");
     const onClickRef = useRef(onMapClick);
     const onDblClickRef = useRef(onMapDblClick);
@@ -144,13 +124,6 @@ function MapInteractions({
     onClickRef.current = onMapClick;
     onDblClickRef.current = onMapDblClick;
     onMoveRef.current = onMouseMove;
-
-    // Fly to
-    useEffect(() => {
-        if (!map || !flyTo || prevFlyToRef.current === flyTo) return;
-        prevFlyToRef.current = flyTo;
-        map.flyTo({ center: flyTo.center, zoom: flyTo.zoom, duration: 1000 });
-    }, [map, flyTo]);
 
     // Style change
     useEffect(() => {
@@ -304,10 +277,7 @@ interface PermitMapProps {
 type ActiveTool = "none" | "measure" | "draw";
 
 export default function PermitMap({ applications }: PermitMapProps) {
-    const [flyTo, setFlyTo] = useState<{ center: [number, number]; zoom: number } | null>(null);
     const [mapStyle, setMapStyle] = useState<MapStyleKey>("street");
-    const [isSearching, setIsSearching] = useState(false);
-    const [searchQuery, setSearchQuery] = useState("");
     const [activeTool, setActiveTool] = useState<ActiveTool>("none");
 
     // Measure tool
@@ -319,15 +289,6 @@ export default function PermitMap({ applications }: PermitMapProps) {
 
     // Cursor coordinates
     const [coords, setCoords] = useState<{ lng: number; lat: number } | null>(null);
-
-    const handleSearch = useCallback(async () => {
-        if (!searchQuery.trim()) return;
-        setIsSearching(true);
-        const result = await geocodeAddress(searchQuery);
-        if (result) setFlyTo({ center: result, zoom: 15 });
-        else toast("Address not found");
-        setIsSearching(false);
-    }, [searchQuery]);
 
     const handleMapClick = useCallback(
         (lng: number, lat: number) => {
@@ -383,7 +344,6 @@ export default function PermitMap({ applications }: PermitMapProps) {
         <div className="relative h-full w-full">
             <Map className="h-full w-full rounded-lg" center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM}>
                 <MapInteractions
-                    flyTo={flyTo}
                     mapStyle={mapStyle}
                     measureMode={measureMode}
                     drawMode={drawMode}
@@ -518,37 +478,6 @@ export default function PermitMap({ applications }: PermitMapProps) {
                 </div>
             </Map>
 
-            {/* Search bar — top left */}
-            <div className="absolute top-4 left-4 z-10 w-72">
-                <div className="relative flex items-center">
-                    <Input
-                        placeholder="Search address or location..."
-                        value={searchQuery}
-                        onChange={e => setSearchQuery(e.target.value)}
-                        onKeyDown={e => e.key === "Enter" && handleSearch()}
-                        className="pr-10 bg-background/95 backdrop-blur"
-                    />
-                    <Button
-                        size="icon"
-                        variant="ghost"
-                        className="absolute right-1 h-8 w-8"
-                        onClick={handleSearch}
-                        disabled={isSearching}
-                    >
-                        {isSearching ? (
-                            <Loader2 className="h-4 w-4 animate-spin" />
-                        ) : (
-                            <Search className="h-4 w-4" />
-                        )}
-                    </Button>
-                </div>
-            </div>
-
-            {/* Permit count — top center */}
-            <div className="absolute top-4 left-1/2 -translate-x-1/2 z-10 bg-background/95 backdrop-blur rounded-full border shadow-lg px-4 py-1 pointer-events-none">
-                <p className="text-xs font-medium">{appsWithCoords.length} permits on map</p>
-            </div>
-
             {/* Coordinate display — bottom left */}
             {coords && (
                 <div className="absolute bottom-4 left-4 z-10 bg-background/90 backdrop-blur rounded-md border shadow px-2.5 py-1 pointer-events-none font-mono">
@@ -606,34 +535,7 @@ export default function PermitMap({ applications }: PermitMapProps) {
                 </div>
             )}
 
-            {/* Status legend — bottom right (above controls) */}
-            <div className="absolute bottom-24 right-4 z-10 bg-background/95 backdrop-blur rounded-lg border shadow-lg p-3">
-                <p className="text-xs font-semibold mb-2">Status Legend</p>
-                <div className="space-y-1.5">
-                    {[
-                        { color: "#3b82f6", label: "Submitted" },
-                        { color: "#eab308", label: "Under Review" },
-                        { color: "#22c55e", label: "Approved" },
-                        { color: "#ef4444", label: "Rejected" },
-                        { color: "#f97316", label: "Needs Correction" },
-                    ].map(({ color, label }) => (
-                        <div key={label} className="flex items-center gap-2">
-                            <div className="w-3 h-3 rounded-full flex-shrink-0" style={{ backgroundColor: color }} />
-                            <span className="text-xs">{label}</span>
-                        </div>
-                    ))}
-                </div>
-            </div>
         </div>
     );
 }
 
-// Lightweight toast for address-not-found (avoids importing sonner)
-function toast(msg: string) {
-    const el = document.createElement("div");
-    el.textContent = msg;
-    el.style.cssText =
-        "position:fixed;bottom:80px;left:50%;transform:translateX(-50%);background:#1e293b;color:#fff;padding:8px 16px;border-radius:8px;font-size:13px;z-index:9999;pointer-events:none";
-    document.body.appendChild(el);
-    setTimeout(() => el.remove(), 2500);
-}

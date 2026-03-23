@@ -19,7 +19,6 @@ import {
     useApproveApplication,
     useRejectApplication,
     useRequireCorrections,
-    useCreateComment,
 } from "@/lib/queries";
 import { usePermissions } from "@/hooks/usePermissions";
 import { toast } from "sonner";
@@ -38,8 +37,8 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
     const router = useRouter();
     const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
     const [decisionNotes, setDecisionNotes] = useState("");
-    const [internalNotes, setInternalNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
+    const [showHistory, setShowHistory] = useState(false);
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [aiSummary, setAiSummary] = useState<string | null>(null);
 
@@ -52,7 +51,6 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
     const approveMutation = useApproveApplication();
     const rejectMutation = useRejectApplication();
     const correctionsMutation = useRequireCorrections();
-    const commentMutation = useCreateComment(resolvedParams?.id || "");
 
     useEffect(() => {
         if (status === "loading") return;
@@ -134,10 +132,6 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
             if (decision === "APPROVE") await approveMutation.mutateAsync(payload);
             else if (decision === "REJECT") await rejectMutation.mutateAsync(payload);
             else await correctionsMutation.mutateAsync(payload);
-
-            if (internalNotes.trim()) {
-                await commentMutation.mutateAsync({ content: internalNotes, isInternal: true });
-            }
 
             const labels: Record<string, string> = {
                 APPROVE: "approved",
@@ -265,63 +259,69 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
                         </CardContent>
                     </Card>
 
-                    {/* Comments */}
-                    {application.comments?.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle>Comments</CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4">
-                                {application.comments.map((comment: any) => (
-                                    <div key={comment.id} className="border-l-2 border-muted pl-4">
-                                        <div className="flex items-center gap-2 mb-1">
-                                            <span className="font-medium text-sm">{comment.author.name}</span>
-                                            {comment.isInternal && (
-                                                <Badge variant="secondary" className="text-xs">Internal</Badge>
-                                            )}
-                                            <span className="text-xs text-muted-foreground">
-                                                {formatDateTime(comment.createdAt)}
-                                            </span>
-                                        </div>
-                                        <p className="text-sm">{comment.content}</p>
-                                    </div>
-                                ))}
-                            </CardContent>
-                        </Card>
-                    )}
+                    {/* History toggle */}
+                    {(application.comments?.length > 0 || application.timeline?.length > 0) && (
+                        <div>
+                            <button
+                                onClick={() => setShowHistory(v => !v)}
+                                className="text-sm text-muted-foreground hover:text-foreground flex items-center gap-1.5 transition-colors"
+                            >
+                                <Clock className="h-3.5 w-3.5" />
+                                {showHistory ? "Hide history" : `View history (${(application.comments?.length || 0) + (application.timeline?.length || 0)})`}
+                            </button>
 
-                    {/* Timeline */}
-                    {application.timeline?.length > 0 && (
-                        <Card>
-                            <CardHeader>
-                                <CardTitle className="flex items-center gap-2">
-                                    <Clock className="h-4 w-4" />
-                                    Timeline
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-4">
-                                    {[...application.timeline].reverse().map((event: any) => (
-                                        <div key={event.id} className="flex gap-3">
-                                            <div className="mt-1.5 flex-shrink-0">
-                                                <div
-                                                    className={`w-2.5 h-2.5 rounded-full ${TIMELINE_COLORS[event.status] ?? "bg-muted-foreground"}`}
-                                                />
-                                            </div>
-                                            <div className="flex-1 min-w-0 pb-4 border-b border-muted last:border-0 last:pb-0">
-                                                <p className="font-medium text-sm">{event.event}</p>
-                                                {event.description && (
-                                                    <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>
-                                                )}
-                                                <p className="text-xs text-muted-foreground mt-1">
-                                                    {formatDateTime(event.createdAt)}
-                                                </p>
-                                            </div>
-                                        </div>
-                                    ))}
+                            {showHistory && (
+                                <div className="mt-4 space-y-4">
+                                    {application.comments?.length > 0 && (
+                                        <Card>
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-sm">Comments</CardTitle>
+                                            </CardHeader>
+                                            <CardContent className="space-y-3">
+                                                {application.comments.map((comment: any) => (
+                                                    <div key={comment.id} className="border-l-2 border-muted pl-3">
+                                                        <div className="flex items-center gap-2 mb-0.5">
+                                                            <span className="font-medium text-xs">{comment.author.name}</span>
+                                                            {comment.isInternal && (
+                                                                <Badge variant="secondary" className="text-xs py-0">Internal</Badge>
+                                                            )}
+                                                            <span className="text-xs text-muted-foreground">{formatDateTime(comment.createdAt)}</span>
+                                                        </div>
+                                                        <p className="text-sm">{comment.content}</p>
+                                                    </div>
+                                                ))}
+                                            </CardContent>
+                                        </Card>
+                                    )}
+
+                                    {application.timeline?.length > 0 && (
+                                        <Card>
+                                            <CardHeader className="pb-3">
+                                                <CardTitle className="text-sm">Timeline</CardTitle>
+                                            </CardHeader>
+                                            <CardContent>
+                                                <div className="space-y-3">
+                                                    {[...application.timeline].reverse().map((event: any) => (
+                                                        <div key={event.id} className="flex gap-3">
+                                                            <div className="mt-1.5 flex-shrink-0">
+                                                                <div className={`w-2 h-2 rounded-full ${TIMELINE_COLORS[event.status] ?? "bg-muted-foreground"}`} />
+                                                            </div>
+                                                            <div className="flex-1 min-w-0 pb-3 border-b border-muted last:border-0 last:pb-0">
+                                                                <p className="text-sm font-medium">{event.event}</p>
+                                                                {event.description && (
+                                                                    <p className="text-xs text-muted-foreground mt-0.5">{event.description}</p>
+                                                                )}
+                                                                <p className="text-xs text-muted-foreground mt-0.5">{formatDateTime(event.createdAt)}</p>
+                                                            </div>
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </CardContent>
+                                        </Card>
+                                    )}
                                 </div>
-                            </CardContent>
-                        </Card>
+                            )}
+                        </div>
                     )}
                 </div>
 
@@ -379,28 +379,18 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
                             <CardContent className="space-y-4">
                                 <div>
                                     <Label htmlFor="decisionNotes">
-                                        Decision Notes <span className="text-destructive">*</span>
+                                        Notes <span className="text-destructive">*</span>
                                     </Label>
                                     <Textarea
                                         id="decisionNotes"
                                         placeholder={
                                             isAwaitingCorrections
                                                 ? "Describe what further action is needed, or approve/reject..."
-                                                : "Provide detailed notes for your decision..."
+                                                : "Provide notes for your decision..."
                                         }
                                         value={decisionNotes}
                                         onChange={e => setDecisionNotes(e.target.value)}
-                                        className="mt-1"
-                                    />
-                                </div>
-                                <div>
-                                    <Label htmlFor="internalNotes">Internal Notes (optional)</Label>
-                                    <Textarea
-                                        id="internalNotes"
-                                        placeholder="Visible to staff only..."
-                                        value={internalNotes}
-                                        onChange={e => setInternalNotes(e.target.value)}
-                                        className="mt-1"
+                                        className="mt-1 min-h-[80px]"
                                     />
                                 </div>
                                 <Separator />
