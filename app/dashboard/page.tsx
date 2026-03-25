@@ -12,6 +12,7 @@ import Link from "next/link";
 import { useApplications, useNotifications } from "@/lib/queries";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ApplicantOnly, StaffOnly } from "@/components/permission-guard";
+import { EmptyState } from "@/components/empty-state";
 import {
     BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip,
     ResponsiveContainer, PieChart, Pie, Cell,
@@ -271,9 +272,10 @@ export default function DashboardPage() {
                         ) : error ? (
                             <p className="text-destructive p-6">Failed to load applications</p>
                         ) : recentApplications.length === 0 ? (
-                            <p className="text-muted-foreground text-center py-8">
-                                No applications yet
-                            </p>
+                            <EmptyState
+                                title="No applications yet"
+                                description="Your recent permit applications will appear here."
+                            />
                         ) : (
                             <div className="space-y-4">
                                 <Table>

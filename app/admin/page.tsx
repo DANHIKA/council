@@ -27,6 +27,7 @@ import { adminApi, type AdminUser } from "@/lib/services/admin";
 import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { useAdminSignoffQueue, useAdminSignoff } from "@/lib/queries";
+import { EmptyState } from "@/components/empty-state";
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -170,7 +171,7 @@ export default function AdminPage() {
                             <span className="text-sm">Loading...</span>
                         </div>
                     ) : pendingApps.length === 0 ? (
-                        <p className="text-muted-foreground text-sm text-center py-6">No applications pending sign-off</p>
+                        <EmptyState title="No applications pending sign-off" description="Applications recommended by officers will appear here." className="py-6" />
                     ) : (
                         <div className="space-y-3">
                             {pendingApps.map((app: any) => {

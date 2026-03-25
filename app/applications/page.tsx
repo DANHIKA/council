@@ -29,6 +29,7 @@ import {
 } from "@/components/ui/sheet";
 import { useApplication, useApplicationDocuments, useApplications } from "@/lib/queries";
 import { NewApplicationDialog } from "@/components/new-application-dialog";
+import { EmptyState } from "@/components/empty-state";
 
 function ApplicationQuickView({ id }: { id: string }) {
     const { data: application, isLoading } = useApplication(id);
@@ -166,7 +167,7 @@ function ApplicationsPageInner() {
 
                 {/* Filters */}
                 <div className="flex flex-col sm:flex-row gap-3">
-                    <div className="relative flex-1">
+                    <div className="relative flex-1 max-w-md">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                         <Input
                             placeholder="Search by type, description or location…"
@@ -195,14 +196,18 @@ function ApplicationsPageInner() {
                     <Card><CardContent className="p-6 text-center"><p className="text-destructive text-sm">Failed to load applications</p></CardContent></Card>
                 ) : applications.length === 0 ? (
                     <Card>
-                        <CardContent className="p-12 text-center space-y-3">
-                            <p className="text-muted-foreground text-sm">
-                                {search || statusFilter !== "all"
-                                    ? "No applications match your filters."
-                                    : "No applications yet."}
-                            </p>
-                            {!search && statusFilter === "all" && (
-                                <Button onClick={() => setNewDialogOpen(true)}>Submit your first application</Button>
+                        <CardContent className="p-0">
+                            {search || statusFilter !== "all" ? (
+                                <EmptyState
+                                    variant="no-results"
+                                    description="No applications match your current search or filters."
+                                />
+                            ) : (
+                                <EmptyState
+                                    title="No applications yet"
+                                    description="Get started by submitting your first permit application."
+                                    action={{ label: "Submit your first application", onClick: () => setNewDialogOpen(true) }}
+                                />
                             )}
                         </CardContent>
                     </Card>

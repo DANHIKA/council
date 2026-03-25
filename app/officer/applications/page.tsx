@@ -47,6 +47,7 @@ import {
     SheetTrigger,
 } from "@/components/ui/sheet";
 import { useApplication, useApplicationDocuments } from "@/lib/queries";
+import { EmptyState } from "@/components/empty-state";
 
 function ApplicationDetails({ id }: { id: string }) {
     const { data: application, isLoading } = useApplication(id);
@@ -200,7 +201,7 @@ export default function OfficerApplicationsPage() {
                 </CardHeader>
                 <CardContent className="space-y-4">
                     <div className="flex flex-col sm:flex-row gap-4">
-                        <div className="relative flex-1">
+                        <div className="relative flex-1 max-w-md">
                             <Search className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                             <Input
                                 placeholder="Search by type, description, location, or applicant..."
@@ -229,13 +230,13 @@ export default function OfficerApplicationsPage() {
                             <p className="text-muted-foreground">Loading applications...</p>
                         </div>
                     ) : error ? (
-                        <div className="text-center py-8">
-                            <p className="text-destructive">Failed to load applications</p>
-                        </div>
+                        <EmptyState variant="error" title="Failed to load applications" description="We couldn't load the application queue. Please try again." />
                     ) : applications.length === 0 ? (
-                        <div className="text-center py-8">
-                            <p className="text-muted-foreground">No applications found</p>
-                        </div>
+                        <EmptyState
+                            variant={search || statusFilter !== "all" ? "no-results" : "no-data"}
+                            title={search || statusFilter !== "all" ? "No results found" : "No applications in queue"}
+                            description={search || statusFilter !== "all" ? "Try adjusting your search or filters." : "There are no applications to review right now."}
+                        />
                     ) : (
                         <div className="border rounded-md">
                             <Table>

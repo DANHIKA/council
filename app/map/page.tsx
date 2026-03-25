@@ -12,6 +12,7 @@ import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { MapPin, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useApplications, usePermitTypes } from "@/lib/queries";
+import { EmptyState } from "@/components/empty-state";
 import dynamic from "next/dynamic";
 
 const PermitMap = dynamic(() => import("@/components/map/permit-map"), {
@@ -71,7 +72,7 @@ export default function PermitMapPage() {
 
             {/* Filters */}
             <div className="flex flex-col sm:flex-row gap-3">
-                <div className="relative flex-1">
+                <div className="relative flex-1 max-w-md">
                     <MapPin className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
                     <Input
                         placeholder="Search by description or location..."
@@ -129,11 +130,13 @@ export default function PermitMapPage() {
                         {isLoading ? (
                             <p className="text-sm text-muted-foreground py-4 text-center">Loading...</p>
                         ) : error ? (
-                            <p className="text-sm text-destructive py-4 text-center">Failed to load</p>
+                            <EmptyState variant="error" title="Failed to load" className="py-6" />
                         ) : applicationsWithLocation.length === 0 ? (
-                            <p className="text-sm text-muted-foreground py-4 text-center">
-                                No applications with location data
-                            </p>
+                            <EmptyState
+                                variant={search || statusFilter !== "all" || permitTypeFilter !== "all" ? "no-results" : "no-data"}
+                                title="No applications with location data"
+                                className="py-6"
+                            />
                         ) : (
                             applicationsWithLocation.map(app => (
                                 <div key={app.id} className="p-3 border rounded-lg hover:bg-muted/50 transition-colors">
