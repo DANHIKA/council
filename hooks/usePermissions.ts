@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useSession";
 import { hasPermission, canAccessRoute, getNavItems } from "@/lib/rbac";
 import type { Permission } from "@/lib/rbac";
 import type { UserRole } from "@/lib/types";

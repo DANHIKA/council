@@ -12,7 +12,6 @@
     "seed": "tsx prisma/seed.ts"
   },
   "dependencies": {
-    "@auth/prisma-adapter": "^2.11.1",
     "@base-ui/react": "^1.2.0",
     "@elevenlabs/cli": "^0.4.3",
     "@elevenlabs/elevenlabs-js": "^2.39.0",
@@ -31,6 +30,8 @@
     "@react-pdf/renderer": "^4.3.2",
     "@react-three/drei": "^10.7.7",
     "@react-three/fiber": "^9.5.0",
+    "@supabase/ssr": "^0.9.0",
+    "@supabase/supabase-js": "^2.100.1",
     "@tanstack/react-query": "^5.90.21",
     "@tanstack/react-query-devtools": "^5.91.3",
     "@types/bcryptjs": "^2.4.6",
@@ -49,7 +50,6 @@
     "maplibre-gl": "^5.20.1",
     "motion": "^12.36.0",
     "next": "16.1.6",
-    "next-auth": "^5.0.0-beta.30",
     "next-themes": "^0.4.6",
     "nodemailer": "^7.0.7",
     "pg": "^8.20.0",

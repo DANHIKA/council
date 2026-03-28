@@ -1,6 +1,6 @@
 import type { Metadata } from "next";
 import { Poppins, Geist, Figtree } from "next/font/google";
-import { SessionProvider } from "next-auth/react";
+import { UserProvider } from "@/contexts/user-context";
 import { QueryProvider } from "@/components/providers/query-provider";
 import { ThemeProvider } from "@/components/providers/theme-provider";
 import { NavigationHeader } from "@/components/navigation-header";
@@ -33,7 +33,7 @@ export default function RootLayout({
       <body
         className={`${poppins.variable} antialiased`}
       >
-        <SessionProvider>
+        <UserProvider>
           <QueryProvider>
             <ThemeProvider
               attribute="class"
@@ -54,7 +54,7 @@ export default function RootLayout({
               <Toaster />
             </ThemeProvider>
           </QueryProvider>
-        </SessionProvider>
+        </UserProvider>
       </body>
     </html>
   );

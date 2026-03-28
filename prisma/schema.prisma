@@ -92,6 +92,7 @@ model User {
   phone         String?
   organization  String?
   department   Department @default(GENERAL)
+  supabaseId    String?   @unique
   createdAt     DateTime  @default(now())
   updatedAt     DateTime  @updatedAt
 

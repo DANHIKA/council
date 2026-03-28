@@ -2,7 +2,6 @@ import "dotenv/config";
 import { PrismaClient, UserRole } from "@prisma/client";
 import { PrismaPg } from "@prisma/adapter-pg";
 import { Pool } from "pg";
-import bcrypt from "bcryptjs";
 
 const prisma = new PrismaClient({
     adapter: new PrismaPg(
@@ -503,44 +502,22 @@ async function upsertPermitTypesAndRequirements() {
 }
 
 async function ensureDemoUsers() {
-    const officerEmail = "officer@demo.local";
-    const adminEmail = "admin@demo.local";
-    const applicantEmail = "applicant@demo.local";
+    const demoUsers = [
+        { email: "officer@demo.local", name: "Demo Officer", role: UserRole.OFFICER },
+        { email: "admin@demo.local",   name: "Demo Admin",   role: UserRole.ADMIN },
+        { email: "applicant@demo.local", name: "Demo Applicant", role: UserRole.APPLICANT },
+    ];
 
-    const passwordHash = await bcrypt.hash("Password123!", 10);
-
-    await prisma.user.upsert({
-        where: { email: officerEmail },
-        update: { role: UserRole.OFFICER },
-        create: {
-            email: officerEmail,
-            name: "Demo Officer",
-            role: UserRole.OFFICER,
-            password: passwordHash,
-        },
-    });
-
-    await prisma.user.upsert({
-        where: { email: adminEmail },
-        update: { role: UserRole.ADMIN },
-        create: {
-            email: adminEmail,
-            name: "Demo Admin",
-            role: UserRole.ADMIN,
-            password: passwordHash,
-        },
-    });
-
-    await prisma.user.upsert({
-        where: { email: applicantEmail },
-        update: { role: UserRole.APPLICANT },
-        create: {
-            email: applicantEmail,
-            name: "Demo Applicant",
-            role: UserRole.APPLICANT,
-            password: passwordHash,
-        },
-    });
+    for (const demo of demoUsers) {
+        // Create Prisma user with no supabaseId — the "claim" pattern.
+        // When the demo user signs up via the browser, their supabaseId will be linked.
+        await prisma.user.upsert({
+            where: { email: demo.email },
+            update: { role: demo.role, name: demo.name },
+            create: { email: demo.email, name: demo.name, role: demo.role },
+        });
+        console.log(`Upserted ${demo.role} user: ${demo.email}`);
+    }
 }
 
 async function main() {
@@ -551,11 +528,9 @@ async function main() {
 main()
     .then(async () => {
         await prisma.$disconnect();
-        // eslint-disable-next-line no-console
         console.log("Seed completed");
     })
     .catch(async (e) => {
-        // eslint-disable-next-line no-console
         console.error(e);
         await prisma.$disconnect();
         process.exit(1);

@@ -2,7 +2,7 @@
 
 import { useEffect } from "react";
 import { useQueryClient } from "@tanstack/react-query";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useSession";
 
 /**
  * Connects to /api/notifications/stream (SSE) and invalidates

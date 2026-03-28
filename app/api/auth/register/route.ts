@@ -1,35 +1,41 @@
 import { NextRequest, NextResponse } from "next/server";
-import bcrypt from "bcryptjs";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
 
 const registerSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
     email: z.string().email("Invalid email address"),
-    password: z.string().min(8, "Password must be at least 8 characters"),
+    // supabaseId is provided by the browser after supabase.auth.signUp() succeeds
+    supabaseId: z.string().uuid("Invalid Supabase user ID"),
 });
 
 export async function POST(req: NextRequest) {
     try {
         const body = await req.json();
-        const validated = registerSchema.parse(body);
+        const { name, email, supabaseId } = registerSchema.parse(body);
 
-        const existing = await prisma.user.findUnique({
-            where: { email: validated.email },
-        });
+        const existing = await prisma.user.findUnique({ where: { email } });
 
         if (existing) {
-            return NextResponse.json({ error: "Email already registered" }, { status: 409 });
+            if (existing.supabaseId) {
+                // Already fully registered
+                return NextResponse.json({ error: "Email already registered" }, { status: 409 });
+            }
+            // Pre-seeded demo account — claim it by linking the Supabase ID
+            await prisma.user.update({
+                where: { email },
+                data: { supabaseId, name },
+            });
+            return NextResponse.json({ message: "Account linked successfully" }, { status: 200 });
         }
 
-        const hashedPassword = await bcrypt.hash(validated.password, 12);
-
+        // Brand-new user — always starts as APPLICANT
         await prisma.user.create({
             data: {
-                name: validated.name,
-                email: validated.email,
-                password: hashedPassword,
+                name,
+                email,
                 role: "APPLICANT",
+                supabaseId,
             },
         });
 
