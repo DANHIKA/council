@@ -31,7 +31,7 @@ import {
     SparklesIcon,
 } from "@hugeicons/core-free-icons";
 import { Mic, MicOff } from "lucide-react";
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
 
 interface ChatMessage {

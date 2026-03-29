@@ -1,6 +1,6 @@
 "use client";
 
-import { useSession } from "next-auth/react";
+import { useSession } from "@/hooks/useSession";
 import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
@@ -106,7 +106,7 @@ function ApplicationDetails({ id }: { id: string }) {
                                         <FileText className="h-4 w-4" />
                                     </div>
                                     <div className="flex flex-col">
-                                        <span className="font-medium line-clamp-1">{doc.fileName}</span>
+                                        <span className="font-medium line-clamp-1">{doc.name}</span>
                                         <span className="text-[10px] text-muted-foreground">{doc.requirement?.label || "General Document"}</span>
                                     </div>
                                 </div>

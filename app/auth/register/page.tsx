@@ -3,6 +3,7 @@
 import { useState } from "react";
 import { useRouter } from "next/navigation";
 import Link from "next/link";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -30,10 +31,22 @@ export default function RegisterPage() {
 
         setLoading(true);
         try {
+            const supabase = createSupabaseBrowserClient();
+            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
+                email,
+                password,
+                options: { data: { name } },
+            });
+
+            if (signUpError || !signUpData.user) {
+                setError(signUpError?.message || "Registration failed.");
+                return;
+            }
+
             const res = await fetch("/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, email, password }),
+                body: JSON.stringify({ name, email, supabaseId: signUpData.user.id }),
             });
             const data = await res.json();
             if (!res.ok) {

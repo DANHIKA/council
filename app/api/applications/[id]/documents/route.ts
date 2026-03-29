@@ -1,8 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { writeFile, mkdir } from "fs/promises";
-import { join } from "path";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 import { z } from "zod";
 
 const uploadSchema = z.object({
@@ -67,16 +66,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         const bytes = await file.arrayBuffer();
         const buffer = Buffer.from(bytes);
 
-        const uploadsDir = join(process.cwd(), "public", "uploads", "applications", id);
-        await mkdir(uploadsDir, { recursive: true });
+        const uniqueSuffix = `${Date.now()}-${Math.round(Math.random() * 1e9)}`;
+        const ext = file.name.split(".").pop()?.toLowerCase() ?? "bin";
+        const storagePath = `applications/${id}/${uniqueSuffix}.${ext}`;
 
-        const uniqueSuffix = Date.now() + "-" + Math.round(Math.random() * 1e9);
-        const filename = `${uniqueSuffix}-${file.name}`;
-        const filepath = join(uploadsDir, filename);
+        const { error: uploadError } = await supabaseAdmin.storage
+            .from("permit-documents")
+            .upload(storagePath, buffer, {
+                contentType: file.type,
+                upsert: false,
+            });
 
-        await writeFile(filepath, buffer);
+        if (uploadError) {
+            console.error("Storage upload error:", uploadError);
+            return NextResponse.json({ error: "File upload failed" }, { status: 500 });
+        }
 
-        const publicUrl = `/uploads/applications/${id}/${filename}`;
+        const { data: { publicUrl } } = supabaseAdmin.storage
+            .from("permit-documents")
+            .getPublicUrl(storagePath);
 
         const document = await prisma.document.create({
             data: {

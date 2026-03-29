@@ -1,3 +1,2 @@
-import { handlers } from "@/lib/auth"
-
-export const { GET, POST } = handlers
+// Next-auth removed — auth is now handled by Supabase
+export {};

@@ -1,7 +1,6 @@
 "use client";
 
 import { useState, useEffect, Suspense } from "react";
-import { signIn, getSession } from "next-auth/react";
 import { useRouter, useSearchParams } from "next/navigation";
 import Link from "next/link";
 import { Button } from "@/components/ui/button";
@@ -10,6 +9,7 @@ import { Label } from "@/components/ui/label";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Alert, AlertDescription } from "@/components/ui/alert";
 import { Loader2, LogIn } from "lucide-react";
+import { createSupabaseBrowserClient } from "@/lib/supabase/client";
 
 const DEMO_ACCOUNTS = [
     { role: "Applicant", email: "applicant@demo.local" },
@@ -36,19 +36,16 @@ function LoginPageInner() {
         e.preventDefault();
         setLoading(true);
         setError(null);
-        try {
-            const result = await signIn("credentials", { email, password, redirect: false });
-            if (result?.error) {
-                setError("Invalid email or password.");
-            } else {
-                await getSession();
-                router.push("/dashboard");
-                router.refresh();
-            }
-        } catch {
-            setError("Something went wrong. Please try again.");
-        } finally {
+
+        const supabase = createSupabaseBrowserClient();
+        const { error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+
+        if (signInError) {
+            setError("Invalid email or password.");
             setLoading(false);
+        } else {
+            router.push("/dashboard");
+            router.refresh();
         }
     };
 
