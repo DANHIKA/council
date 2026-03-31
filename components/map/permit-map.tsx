@@ -2,7 +2,7 @@
 
 import React, { useCallback, useEffect, useRef, useState } from "react";
 import Link from "next/link";
-import type { MapMouseEvent } from "maplibre-gl";
+import type { MapMouseEvent, LngLatBoundsLike } from "maplibre-gl";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
 import {
@@ -18,8 +18,9 @@ import type { Application } from "@/lib/types";
 import { Ruler, RotateCcw, Pentagon, MapPin } from "lucide-react";
 
 // MapLibre uses [longitude, latitude] — opposite of Leaflet!
-const DEFAULT_CENTER: [number, number] = [28.0473, -26.2041]; // Johannesburg
-const DEFAULT_ZOOM = 12;
+// Default to Malawi center (adjust based on your region)
+const DEFAULT_CENTER: [number, number] = [33.7741, -13.9626]; // Malawi
+const DEFAULT_ZOOM = 6;
 
 const MAP_STYLES = {
     street: "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json",
@@ -268,6 +269,68 @@ function MapInteractions({
     return null;
 }
 
+// ─── Map Center Handler ───────────────────────────────────────────────────────
+
+interface MapCenterHandlerProps {
+    applications: Application[];
+}
+
+function MapCenterHandler({ applications }: MapCenterHandlerProps) {
+    const { map } = useMap();
+    const hasCenteredRef = useRef(false);
+
+    useEffect(() => {
+        if (!map || hasCenteredRef.current) return;
+
+        const appsWithCoords = applications.filter(a => a.latitude != null && a.longitude != null);
+
+        // Try to get user's location first
+        if (navigator.geolocation) {
+            navigator.geolocation.getCurrentPosition(
+                (position) => {
+                    const { latitude, longitude } = position.coords;
+                    if (map && !hasCenteredRef.current) {
+                        map.flyTo({ center: [longitude, latitude], zoom: 12, duration: 1000 });
+                        hasCenteredRef.current = true;
+                    }
+                },
+                () => {
+                    // Geolocation failed, try to fit to markers
+                    if (appsWithCoords.length > 0 && map && !hasCenteredRef.current) {
+                        fitToMarkers(map, appsWithCoords);
+                        hasCenteredRef.current = true;
+                    }
+                },
+                { timeout: 5000, enableHighAccuracy: false }
+            );
+        } else {
+            // No geolocation support, fit to markers
+            if (appsWithCoords.length > 0 && map && !hasCenteredRef.current) {
+                fitToMarkers(map, appsWithCoords);
+                hasCenteredRef.current = true;
+            }
+        }
+    }, [map, applications]);
+
+    return null;
+}
+
+function fitToMarkers(map: any, apps: Application[]) {
+    if (apps.length === 0) return;
+
+    const bounds = new (window as any).maplibregl.LngLatBounds();
+    
+    apps.forEach(app => {
+        if (app.latitude != null && app.longitude != null) {
+            bounds.extend([app.longitude, app.latitude]);
+        }
+    });
+
+    if (!bounds.isEmpty()) {
+        map.fitBounds(bounds, { padding: 50, maxZoom: 14, duration: 1000 });
+    }
+}
+
 // ─── Main component ───────────────────────────────────────────────────────────
 
 interface PermitMapProps {
@@ -343,6 +406,7 @@ export default function PermitMap({ applications }: PermitMapProps) {
     return (
         <div className="relative h-full w-full">
             <Map className="h-full w-full rounded-lg" center={DEFAULT_CENTER} zoom={DEFAULT_ZOOM}>
+                <MapCenterHandler applications={applications} />
                 <MapInteractions
                     mapStyle={mapStyle}
                     measureMode={measureMode}

@@ -12,6 +12,7 @@ import {
     SheetContent,
     SheetHeader,
     SheetTitle,
+    SheetFooter,
 } from "@/components/ui/sheet";
 import {
     Dialog,
@@ -177,7 +178,7 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                             <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                         </div>
                     ) : (
-                        <div className="flex-1 overflow-y-auto px-6 py-6 space-y-6">
+                        <div className="flex-1 overflow-y-auto px-6 py-8 space-y-8">
                             {/* Avatar */}
                             <div className="flex items-center gap-4">
                                 <div className="relative group cursor-pointer shrink-0" onClick={() => fileInputRef.current?.click()}>
@@ -200,36 +201,45 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                             </div>
 
                             {/* Form */}
-                            <form onSubmit={handleSubmit(onSubmit)} className="space-y-4">
-                                <div className="space-y-1.5">
+                            <form onSubmit={handleSubmit(onSubmit)} className="space-y-5">
+                                <div className="space-y-2">
                                     <Label htmlFor="ps-name">Full name</Label>
                                     <Input id="ps-name" {...register("name")} />
                                     {errors.name && <p className="text-xs text-destructive">{errors.name.message}</p>}
                                 </div>
 
-                                <div className="space-y-1.5">
+                                <div className="space-y-2">
                                     <Label htmlFor="ps-email">Email</Label>
                                     <Input id="ps-email" value={email} disabled className="bg-muted/40" />
                                 </div>
 
-                                <div className="space-y-1.5">
+                                <div className="space-y-2">
                                     <Label htmlFor="ps-phone">Phone</Label>
                                     <Input id="ps-phone" {...register("phone")} placeholder="+265 999 000 000" />
                                 </div>
 
-                                <div className="space-y-1.5">
+                                <div className="space-y-2">
                                     <Label htmlFor="ps-org">Organization</Label>
                                     <Input id="ps-org" {...register("organization")} placeholder="Optional" />
                                 </div>
-
-                                <div className="flex justify-end pt-2">
-                                    <Button type="submit" disabled={!isDirty || saving}>
-                                        {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
-                                        Save
-                                    </Button>
-                                </div>
                             </form>
                         </div>
+                    )}
+
+                    {!loading && (
+                        <SheetFooter className="px-6 py-4 border-t shrink-0">
+                            <div className="flex justify-end w-full">
+                                <Button 
+                                    type="button" 
+                                    onClick={handleSubmit(onSubmit)}
+                                    disabled={!isDirty || saving}
+                                    className="min-w-[80px]"
+                                >
+                                    {saving && <Loader2 className="h-4 w-4 mr-2 animate-spin" />}
+                                    Save
+                                </Button>
+                            </div>
+                        </SheetFooter>
                     )}
                 </SheetContent>
             </Sheet>

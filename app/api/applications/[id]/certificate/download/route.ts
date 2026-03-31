@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { generateCertificatePdf } from "@/lib/certificate-pdf";
 
 export async function GET(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -12,7 +13,15 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
 
         const application = await prisma.permitApplication.findUnique({
             where: { id },
-            select: { id: true, applicantId: true, certificate: true },
+            select: {
+                id: true,
+                applicantId: true,
+                permitType: true,
+                location: true,
+                permitTypeRef: { select: { name: true } },
+                applicant: { select: { name: true } },
+                certificate: true,
+            },
         });
 
         if (!application) {
@@ -36,9 +45,17 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             data: { downloadCount: { increment: 1 } },
         });
 
-        const pdf = Buffer.from(`Certificate PDF placeholder for ${application.certificate.certificateNo}`, "utf-8");
+        const pdf = await generateCertificatePdf({
+            certificateNo: application.certificate.certificateNo,
+            applicantName: application.applicant.name || "Applicant",
+            permitType: application.permitTypeRef?.name || application.permitType,
+            location: application.location,
+            issueDate: application.certificate.issueDate,
+            expiryDate: application.certificate.expiryDate,
+            qrCodePayload: application.certificate.qrCode,
+        });
 
-        return new NextResponse(pdf, {
+        return new NextResponse(new Uint8Array(pdf), {
             headers: {
                 "Content-Type": "application/pdf",
                 "Content-Disposition": `attachment; filename="certificate-${application.certificate.certificateNo}.pdf"`,

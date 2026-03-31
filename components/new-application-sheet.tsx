@@ -4,14 +4,15 @@ import { useState, useEffect } from "react";
 import { useForm, Controller, useWatch } from "react-hook-form";
 import { zodResolver } from "@hookform/resolvers/zod";
 import { z } from "zod";
+import { LocationPicker, type LocationValue } from "@/components/location-picker";
 import {
     Sheet,
     SheetContent,
     SheetHeader,
     SheetTitle,
+    SheetFooter,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
-import { Input } from "@/components/ui/input";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
@@ -22,12 +23,13 @@ import { Loader2, AlertCircle, X, FileText, CheckCircle2 } from "lucide-react";
 import { applicationsApi, permitTypesApi } from "@/lib/services";
 import type { PermitType } from "@/lib/types";
 import { toast } from "sonner";
-import { cn } from "@/lib/utils";
 
 export const applicationSchema = z.object({
     permitTypeId: z.string().min(1, "Please select a permit type"),
     description: z.string().min(10, "Description must be at least 10 characters"),
     location: z.string().min(3, "Location is required"),
+    latitude: z.number().optional(),
+    longitude: z.number().optional(),
 });
 
 type ApplicationFormData = z.infer<typeof applicationSchema>;
@@ -55,7 +57,7 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
     const [error, setError] = useState<string | null>(null);
     const [success, setSuccess] = useState(false);
 
-    const { register, handleSubmit, formState: { errors }, control, reset } =
+    const { register, handleSubmit, formState: { errors }, control, reset, setValue, watch } =
         useForm<ApplicationFormData>({ resolver: zodResolver(applicationSchema) });
 
     const watchedPermitTypeId = useWatch({ control, name: "permitTypeId" }) || "";
@@ -99,6 +101,18 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
         .filter(r => r.required)
         .every(r => getPendingFileForRequirement(r.id)) ?? false;
 
+    const locationValue: LocationValue = {
+        location: watch("location") || "",
+        latitude: watch("latitude"),
+        longitude: watch("longitude"),
+    };
+
+    const handleLocationChange = (val: LocationValue) => {
+        setValue("location", val.location, { shouldValidate: true });
+        setValue("latitude", val.latitude);
+        setValue("longitude", val.longitude);
+    };
+
     const onSubmit = async (data: ApplicationFormData) => {
         if (!selectedPermitType) return;
         setSubmitting(true);
@@ -140,83 +154,92 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
                         <Button onClick={() => onOpenChange(false)}>Done</Button>
                     </div>
                 ) : (
-                    <div className="flex-1 overflow-y-auto">
-                        {loadingTypes ? (
-                            <div className="flex items-center justify-center py-20">
-                                <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
-                            </div>
-                        ) : (
-                            <form onSubmit={handleSubmit(onSubmit)} className="px-6 py-6 space-y-5">
-                                {error && (
-                                    <Alert variant="destructive">
-                                        <AlertCircle className="h-4 w-4" />
-                                        <AlertDescription>{error}</AlertDescription>
-                                    </Alert>
-                                )}
-
-                                <div className="space-y-1.5">
-                                    <Label>Permit type</Label>
-                                    <Controller
-                                        name="permitTypeId"
-                                        control={control}
-                                        render={({ field }) => (
-                                            <Select onValueChange={field.onChange} value={field.value || ""}>
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select permit type" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {permitTypes.map(pt => (
-                                                        <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        )}
-                                    />
-                                    {errors.permitTypeId && <p className="text-xs text-destructive">{errors.permitTypeId.message}</p>}
+                    <>
+                        <div className="flex-1 overflow-y-auto">
+                            {loadingTypes ? (
+                                <div className="flex items-center justify-center py-20">
+                                    <Loader2 className="h-5 w-5 animate-spin text-muted-foreground" />
                                 </div>
+                            ) : (
+                                <div className="px-6 py-8 space-y-6">
+                                    {error && (
+                                        <Alert variant="destructive">
+                                            <AlertCircle className="h-4 w-4" />
+                                            <AlertDescription>{error}</AlertDescription>
+                                        </Alert>
+                                    )}
 
-                                <div className="space-y-1.5">
-                                    <Label>Description</Label>
-                                    <Textarea
-                                        placeholder="Describe your permit request"
-                                        className="min-h-[90px] resize-none"
-                                        {...register("description")}
-                                    />
-                                    {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
-                                </div>
+                                    <div className="space-y-2">
+                                        <Label>Permit type</Label>
+                                        <Controller
+                                            name="permitTypeId"
+                                            control={control}
+                                            render={({ field }) => (
+                                                <Select onValueChange={field.onChange} value={field.value || ""}>
+                                                    <SelectTrigger>
+                                                        <SelectValue placeholder="Select permit type" />
+                                                    </SelectTrigger>
+                                                    <SelectContent>
+                                                        {permitTypes.map(pt => (
+                                                            <SelectItem key={pt.id} value={pt.id}>{pt.name}</SelectItem>
+                                                        ))}
+                                                    </SelectContent>
+                                                </Select>
+                                            )}
+                                        />
+                                        {errors.permitTypeId && <p className="text-xs text-destructive">{errors.permitTypeId.message}</p>}
+                                    </div>
 
-                                <div className="space-y-1.5">
-                                    <Label>Location</Label>
-                                    <Input placeholder="Where will this take place?" {...register("location")} />
-                                    {errors.location && <p className="text-xs text-destructive">{errors.location.message}</p>}
-                                </div>
+                                    <div className="space-y-2">
+                                        <Label>Description</Label>
+                                        <Textarea
+                                            placeholder="Describe your permit request"
+                                            className="min-h-[90px] resize-none"
+                                            {...register("description")}
+                                        />
+                                        {errors.description && <p className="text-xs text-destructive">{errors.description.message}</p>}
+                                    </div>
+
+                                    <div className="space-y-2">
+                                        <Label>Location</Label>
+                                        <LocationPicker
+                                            value={locationValue}
+                                            onChange={handleLocationChange}
+                                            error={errors.location?.message}
+                                            disabled={submitting}
+                                        />
+                                    </div>
 
                                 {selectedPermitType && selectedPermitType.requirements.length > 0 && (
-                                    <div className="space-y-3 animate-in fade-in slide-in-from-bottom-1">
+                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-1">
                                         <Label>Documents</Label>
                                         {selectedPermitType.requirements.map(req => {
                                             const pending = getPendingFileForRequirement(req.id);
                                             return (
-                                                <div key={req.id} className="border rounded-xl p-3 flex items-center justify-between gap-3">
-                                                    <div className="min-w-0">
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="text-sm font-medium truncate">{req.label}</span>
-                                                            {req.required && !pending && (
-                                                                <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-muted-foreground shrink-0">Required</Badge>
-                                                            )}
-                                                            {pending && (
-                                                                <Badge className="text-[10px] h-4 px-1.5 bg-green-600 border-none shrink-0">Ready</Badge>
-                                                            )}
+                                                <div key={req.id} className="border rounded-xl p-5 space-y-3">
+                                                    <div className="flex items-start justify-between gap-2">
+                                                        <div className="space-y-1 min-w-0">
+                                                            <div className="flex items-center gap-2 flex-wrap">
+                                                                <span className="text-sm font-medium">{req.label}</span>
+                                                                {req.required && !pending && (
+                                                                    <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-muted-foreground">Required</Badge>
+                                                                )}
+                                                                {pending && (
+                                                                    <Badge className="text-[10px] h-4 px-1.5 bg-green-600 border-none">Ready</Badge>
+                                                                )}
+                                                            </div>
                                                         </div>
                                                     </div>
-                                                    <div className="shrink-0">
+                                                    <div className="flex items-center gap-3">
                                                         {pending ? (
-                                                            <div className="flex items-center gap-1.5 border rounded-lg p-1 pr-0.5 bg-background">
-                                                                <FileText className="h-3.5 w-3.5 text-primary ml-1" />
-                                                                <span className="text-xs max-w-[80px] truncate">{pending.file.name}</span>
-                                                                <Button type="button" variant="ghost" size="icon-xs" className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                                            <div className="flex items-center gap-2 border rounded-lg p-2 pr-1 bg-background flex-1">
+                                                                <div className="h-8 w-8 bg-green-500/10 rounded-md flex items-center justify-center">
+                                                                    <FileText className="h-4 w-4 text-green-600" />
+                                                                </div>
+                                                                <span className="text-sm font-medium truncate flex-1">{pending.file.name}</span>
+                                                                <Button type="button" variant="ghost" size="icon-xs" className="h-7 w-7 text-muted-foreground hover:text-destructive"
                                                                     onClick={() => setPendingFiles(p => p.filter(f => f.id !== pending.id))}>
-                                                                    <X className="h-3 w-3" />
+                                                                    <X className="h-3.5 w-3.5" />
                                                                 </Button>
                                                             </div>
                                                         ) : (
@@ -228,18 +251,28 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
                                         })}
                                     </div>
                                 )}
+                                </div>
+                            )}
+                        </div>
 
-                                <div className="flex items-center justify-between pt-3 pb-2">
+                        {!loadingTypes && (
+                            <SheetFooter className="px-6 py-4 border-t shrink-0">
+                                <div className="flex items-center justify-between w-full">
                                     <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">
                                         Cancel
                                     </Button>
-                                    <Button type="submit" disabled={!selectedPermitType || !allRequiredSatisfied || submitting}>
+                                    <Button 
+                                        type="button" 
+                                        onClick={handleSubmit(onSubmit)}
+                                        disabled={!selectedPermitType || !allRequiredSatisfied || submitting}
+                                        className="min-w-[100px]"
+                                    >
                                         {submitting ? <><Loader2 className="h-4 w-4 mr-2 animate-spin" />Submitting…</> : "Submit"}
                                     </Button>
                                 </div>
-                            </form>
+                            </SheetFooter>
                         )}
-                    </div>
+                    </>
                 )}
             </SheetContent>
         </Sheet>

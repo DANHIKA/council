@@ -7,6 +7,7 @@ import {
     SheetContent,
     SheetHeader,
     SheetTitle,
+    SheetFooter,
 } from "@/components/ui/sheet";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
@@ -140,7 +141,7 @@ export function EditApplicationSheet({ applicationId, open, onOpenChange, onSucc
                     </div>
                 ) : (
                     <div className="flex-1 overflow-y-auto">
-                        <div className="px-6 py-6 space-y-6">
+                        <div className="px-6 py-8 space-y-8">
                             {isCorrection && correctionNote && (
                                 <Alert className="border-orange-200 bg-orange-50 dark:bg-orange-950/20 dark:border-orange-800">
                                     <AlertCircle className="h-4 w-4 text-orange-600" />
@@ -150,7 +151,7 @@ export function EditApplicationSheet({ applicationId, open, onOpenChange, onSucc
                                 </Alert>
                             )}
 
-                            <div className="space-y-3">
+                            <div className="space-y-4">
                                 {permitType ? permitType.requirements.map(req => {
                                     const existing = getExistingDoc(req.id);
                                     const pending = getPendingFile(req.id);
@@ -161,56 +162,58 @@ export function EditApplicationSheet({ applicationId, open, onOpenChange, onSucc
                                         <div
                                             key={req.id}
                                             className={cn(
-                                                "border rounded-xl p-4 flex flex-col sm:flex-row sm:items-center justify-between gap-3",
+                                                "border rounded-xl p-5 space-y-3",
                                                 isRejected && "border-red-200 bg-red-50/30 dark:border-red-900 dark:bg-red-950/10"
                                             )}
                                         >
-                                            <div className="space-y-0.5 min-w-0">
-                                                <div className="flex items-center gap-2">
-                                                    <span className="text-sm font-medium">{req.label}</span>
-                                                    {req.required && (
-                                                        <Badge
-                                                            variant={satisfied ? "default" : "outline"}
-                                                            className={cn(
-                                                                "text-[10px] h-4 px-1.5",
-                                                                isRejected ? "bg-red-600 border-none"
-                                                                    : satisfied ? "bg-green-600 border-none"
-                                                                    : "text-muted-foreground"
-                                                            )}
-                                                        >
-                                                            {isRejected ? "Rejected" : satisfied ? (existing ? "Uploaded" : "Pending") : "Required"}
-                                                        </Badge>
+                                            <div className="flex items-start justify-between gap-2">
+                                                <div className="space-y-1 min-w-0">
+                                                    <div className="flex items-center gap-2 flex-wrap">
+                                                        <span className="text-sm font-medium">{req.label}</span>
+                                                        {req.required && (
+                                                            <Badge
+                                                                variant={satisfied ? "default" : "outline"}
+                                                                className={cn(
+                                                                    "text-[10px] h-4 px-1.5",
+                                                                    isRejected ? "bg-red-600 border-none"
+                                                                        : satisfied ? "bg-green-600 border-none"
+                                                                        : "text-muted-foreground"
+                                                                )}
+                                                            >
+                                                                {isRejected ? "Rejected" : satisfied ? (existing ? "Uploaded" : "Pending") : "Required"}
+                                                            </Badge>
+                                                        )}
+                                                    </div>
+                                                    {req.description && <p className="text-xs text-muted-foreground">{req.description}</p>}
+                                                    {isRejected && existing?.reviewNotes && (
+                                                        <p className="text-xs text-red-600 dark:text-red-400">Reason: {existing.reviewNotes}</p>
                                                     )}
                                                 </div>
-                                                {req.description && <p className="text-xs text-muted-foreground">{req.description}</p>}
-                                                {isRejected && existing?.reviewNotes && (
-                                                    <p className="text-xs text-red-600 dark:text-red-400">Reason: {existing.reviewNotes}</p>
-                                                )}
                                             </div>
 
-                                            <div className="shrink-0">
+                                            <div className="flex items-center gap-3">
                                                 {existing && !pending ? (
-                                                    <div className="flex items-center gap-2 border rounded-lg p-1.5 pr-1 bg-background">
-                                                        <div className="h-7 w-7 bg-primary/10 rounded-md flex items-center justify-center">
-                                                            <FileText className="h-3.5 w-3.5 text-primary" />
+                                                    <div className="flex items-center gap-2 border rounded-lg p-2 pr-1 bg-background flex-1">
+                                                        <div className="h-8 w-8 bg-primary/10 rounded-md flex items-center justify-center">
+                                                            <FileText className="h-4 w-4 text-primary" />
                                                         </div>
-                                                        <span className="text-xs font-medium max-w-[100px] truncate">{existing.name}</span>
+                                                        <span className="text-sm font-medium truncate flex-1">{existing.name}</span>
                                                         <Button type="button" variant="ghost" size="icon-xs"
-                                                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
                                                             onClick={() => deleteDocMutation.mutate(existing.id)}>
-                                                            <X className="h-3 w-3" />
+                                                            <X className="h-3.5 w-3.5" />
                                                         </Button>
                                                     </div>
                                                 ) : pending ? (
-                                                    <div className="flex items-center gap-2 border rounded-lg p-1.5 pr-1 bg-background">
-                                                        <div className="h-7 w-7 bg-green-500/10 rounded-md flex items-center justify-center">
-                                                            <FileText className="h-3.5 w-3.5 text-green-600" />
+                                                    <div className="flex items-center gap-2 border rounded-lg p-2 pr-1 bg-background flex-1">
+                                                        <div className="h-8 w-8 bg-green-500/10 rounded-md flex items-center justify-center">
+                                                            <FileText className="h-4 w-4 text-green-600" />
                                                         </div>
-                                                        <span className="text-xs font-medium max-w-[100px] truncate">{pending.file.name}</span>
+                                                        <span className="text-sm font-medium truncate flex-1">{pending.file.name}</span>
                                                         <Button type="button" variant="ghost" size="icon-xs"
-                                                            className="h-6 w-6 text-muted-foreground hover:text-destructive"
+                                                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
                                                             onClick={() => setPendingFiles(p => p.filter(f => f.id !== pending.id))}>
-                                                            <X className="h-3 w-3" />
+                                                            <X className="h-3.5 w-3.5" />
                                                         </Button>
                                                     </div>
                                                 ) : (
@@ -226,23 +229,27 @@ export function EditApplicationSheet({ applicationId, open, onOpenChange, onSucc
                                     </div>
                                 )}
                             </div>
-
-                            <div className="flex items-center justify-between pt-2 pb-4">
-                                <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">
-                                    Cancel
-                                </Button>
-                                <Button onClick={handleSave} disabled={!canSave}>
-                                    {uploading || resubmitMutation.isPending ? (
-                                        <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{isCorrection ? "Submitting…" : "Uploading…"}</>
-                                    ) : isCorrection ? (
-                                        <><Send className="h-4 w-4 mr-2" />Submit corrections</>
-                                    ) : (
-                                        <><CheckCircle2 className="h-4 w-4 mr-2" />Save changes</>
-                                    )}
-                                </Button>
-                            </div>
                         </div>
                     </div>
+                )}
+
+                {application && !isLoading && (
+                    <SheetFooter className="px-6 py-4 border-t shrink-0">
+                        <div className="flex items-center justify-between w-full">
+                            <Button variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">
+                                Cancel
+                            </Button>
+                            <Button onClick={handleSave} disabled={!canSave} className="min-w-[140px]">
+                                {uploading || resubmitMutation.isPending ? (
+                                    <><Loader2 className="h-4 w-4 mr-2 animate-spin" />{isCorrection ? "Submitting…" : "Uploading…"}</>
+                                ) : isCorrection ? (
+                                    <><Send className="h-4 w-4 mr-2" />Submit corrections</>
+                                ) : (
+                                    <><CheckCircle2 className="h-4 w-4 mr-2" />Save changes</>
+                                )}
+                            </Button>
+                        </div>
+                    </SheetFooter>
                 )}
             </SheetContent>
         </Sheet>
