@@ -1,16 +1,22 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateOllamaContent } from "@/lib/ollama";
+import { generate, getProvider } from "@/lib/ai-provider";
 import { auth } from "@/lib/auth";
 
+type AIProvider = "groq" | "gemini" | "ollama";
+
 export async function POST(req: NextRequest) {
+    let provider: AIProvider | undefined;
+    
     try {
         const session = await auth();
         if (!session || (session.user as any).role === "APPLICANT") {
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
-        const { applicationId } = await req.json();
+        const body = await req.json();
+        provider = body.provider as AIProvider | undefined;
+        const { applicationId } = body;
 
         if (!applicationId) {
             return NextResponse.json({ error: "Application ID is required" }, { status: 400 });
@@ -50,13 +56,14 @@ Provide a 4-line summary with:
 
 Summary:`;
 
-        const summary = await generateOllamaContent(prompt);
+        const summary = await generate(prompt, 512, provider);
 
         return NextResponse.json({ summary });
     } catch (error: any) {
         console.error("Auto-summary error:", error);
 
-        const isServiceError = error?.message?.includes("Ollama") || error?.message?.includes("connection");
+        const providerForError = provider || getProvider();
+        const isServiceError = error?.message?.includes("API") || error?.message?.includes("connection") || error?.message?.includes(providerForError);
         if (isServiceError) {
             return NextResponse.json({
                 error: "AI is currently unavailable",

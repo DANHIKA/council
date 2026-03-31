@@ -1,7 +1,9 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { chatWithOllama } from "@/lib/ollama";
+import { chat, getProvider } from "@/lib/ai-provider";
 import { getRelevantScenarios } from "@/lib/ai-scenarios";
+
+type AIProvider = "groq" | "gemini" | "ollama";
 
 const GREETING_RE = /^(hi|hello|hey|howdy|good\s*(morning|afternoon|evening)|greetings|what'?s up|sup|yo)[\s!?.]*$/i;
 const THANKS_RE = /^(thanks?|thank you|cheers|got it|ok|okay|great|perfect|awesome|cool)[\s!.]*$/i;
@@ -46,8 +48,12 @@ function buildDocsResponse(permit: { name: string; requirements: { label: string
 }
 
 export async function POST(req: NextRequest) {
+    let provider: AIProvider | undefined;
+    
     try {
-        const { messages } = await req.json();
+        const body = await req.json();
+        provider = body.provider as AIProvider | undefined;
+        const { messages } = body;
 
         if (!messages || !Array.isArray(messages)) {
             return NextResponse.json({ error: "Messages are required" }, { status: 400 });
@@ -131,17 +137,19 @@ export async function POST(req: NextRequest) {
         const systemContent =
             `Council permit assistant. One sentence only. Available permits: ${permitNames.join(", ")}.`;
 
-        const responseText = await chatWithOllama(
+        const responseText = await chat(
             [{ role: "system" as const, content: systemContent }, ...messages],
-            80
+            80,
+            provider
         );
 
         return NextResponse.json({ response: responseText });
     } catch (error: any) {
         console.error("AI Chat error:", error);
-        const isOllamaError =
-            error?.message?.includes("Ollama") || error?.message?.includes("connection");
-        if (isOllamaError) {
+        const providerForError = provider || getProvider();
+        const isProviderError =
+            error?.message?.includes("API") || error?.message?.includes("connection") || error?.message?.includes(providerForError);
+        if (isProviderError) {
             return NextResponse.json(
                 { response: "The AI service is temporarily unavailable. Please try again." },
                 { status: 503 }
