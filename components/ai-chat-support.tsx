@@ -30,9 +30,29 @@ import {
     SentIcon,
     SparklesIcon,
 } from "@hugeicons/core-free-icons";
-import { Mic, MicOff } from "lucide-react";
+import { Mic, MicOff, Cpu } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
+import {
+    Select,
+    SelectContent,
+    SelectItem,
+    SelectTrigger,
+    SelectValue,
+} from "@/components/ui/select";
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from "@/components/ui/popover";
+
+type AIProvider = "groq" | "gemini" | "ollama";
+
+const PROVIDER_INFO: Record<AIProvider, { label: string; model: string; desc: string }> = {
+    groq: { label: "Groq", model: "Llama 3.1 70B", desc: "Fast & reliable" },
+    gemini: { label: "Gemini", model: "Gemini 2.0 Flash", desc: "Smart & versatile" },
+    ollama: { label: "Ollama", model: "TinyLLaMA", desc: "Local & private" },
+};
 
 interface ChatMessage {
     role: "user" | "assistant";
@@ -99,6 +119,7 @@ export function AIChatSupport() {
     const [chatStatus, setChatStatus] = useState<
         "idle" | "sending" | "thinking" | "responding"
     >("idle");
+    const [selectedProvider, setSelectedProvider] = useState<AIProvider>("groq");
 
     const mic = useMicInput(
         useCallback(
@@ -153,7 +174,7 @@ export function AIChatSupport() {
             const res = await fetch(chatEndpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ messages: history }),
+                body: JSON.stringify({ messages: history, provider: selectedProvider }),
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
@@ -189,7 +210,7 @@ export function AIChatSupport() {
                     >
                         <HugeiconsIcon icon={Chat01Icon} className="h-6 w-6" />
                     </Button>
-                    <SheetContent side="right" className="w-full sm:w-[400px] p-0 flex flex-col">
+                    <SheetContent side="right" className="w-full sm:w-[650px] p-0 flex flex-col">
                         <SheetHeader className="p-4 bg-primary text-primary-foreground flex flex-row items-center justify-between space-y-0 shrink-0">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <HugeiconsIcon icon={SparklesIcon} className="h-5 w-5 shrink-0" />
@@ -208,6 +229,45 @@ export function AIChatSupport() {
                                     />
                                 )}
                             </div>
+                            <Popover>
+                                <PopoverTrigger>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="h-8 gap-1.5 text-primary-foreground hover:bg-white/10 shrink-0"
+                                    >
+                                        <Cpu className="h-3.5 w-3.5" />
+                                        <span className="text-xs font-medium">
+                                            {PROVIDER_INFO[selectedProvider].label}
+                                        </span>
+                                    </Button>
+                                </PopoverTrigger>
+                                <PopoverContent className="w-56 p-0" align="end">
+                                    <div className="p-2">
+                                        <p className="text-xs font-medium mb-2 px-2">AI Provider</p>
+                                        <Select
+                                            value={selectedProvider}
+                                            onValueChange={(v) => setSelectedProvider(v as AIProvider)}
+                                        >
+                                            <SelectTrigger className="h-8 text-xs">
+                                                <SelectValue />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                {Object.entries(PROVIDER_INFO).map(([key, info]) => (
+                                                    <SelectItem key={key} value={key} className="text-xs">
+                                                        <div className="flex flex-col">
+                                                            <span className="font-medium">{info.label}</span>
+                                                            <span className="text-muted-foreground text-[10px]">
+                                                                {info.model} — {info.desc}
+                                                            </span>
+                                                        </div>
+                                                    </SelectItem>
+                                                ))}
+                                            </SelectContent>
+                                        </Select>
+                                    </div>
+                                </PopoverContent>
+                            </Popover>
                         </SheetHeader>
 
                         {/* Messages */}

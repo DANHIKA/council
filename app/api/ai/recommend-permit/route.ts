@@ -1,11 +1,17 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generateOllamaContent } from "@/lib/ollama";
+import { generate, getProvider } from "@/lib/ai-provider";
 import { getRelevantScenarios } from "@/lib/ai-scenarios";
 
+type AIProvider = "groq" | "gemini" | "ollama";
+
 export async function POST(req: NextRequest) {
+    let provider: AIProvider | undefined;
+    
     try {
-        const { description } = await req.json();
+        const body = await req.json();
+        provider = body.provider as AIProvider | undefined;
+        const { description } = body;
 
         if (!description) {
             return NextResponse.json({ error: "Description is required" }, { status: 400 });
@@ -32,8 +38,8 @@ User wants: "${description}"
 
 What permit is needed? Reply with just the permit name.`;
 
-        const responseText = await generateOllamaContent(prompt);
-        console.log("Ollama recommend response:", responseText);
+        const responseText = await generate(prompt, 512, provider);
+        console.log(`${provider || getProvider()} recommend response:`, responseText);
 
         try {
             // Try to find a matching permit type in the response
@@ -70,7 +76,8 @@ What permit is needed? Reply with just the permit name.`;
     } catch (error: any) {
         console.error("Permit recommendation error:", error);
 
-        const isServiceError = error?.message?.includes("Ollama") || error?.message?.includes("connection");
+        const providerForError = provider || getProvider();
+        const isServiceError = error?.message?.includes("API") || error?.message?.includes("connection") || error?.message?.includes(providerForError);
         if (isServiceError) {
             return NextResponse.json({
                 recommendation: "AI Unavailable",
