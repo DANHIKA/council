@@ -210,7 +210,7 @@ export function AIChatSupport() {
                     >
                         <HugeiconsIcon icon={Chat01Icon} className="h-6 w-6" />
                     </Button>
-                    <SheetContent side="right" className="w-full sm:w-[400px] p-0 flex flex-col">
+                    <SheetContent side="right" className="w-full sm:w-[650px] p-0 flex flex-col">
                         <SheetHeader className="p-4 bg-primary text-primary-foreground flex flex-row items-center justify-between space-y-0 shrink-0">
                             <div className="flex items-center gap-2 flex-1 min-w-0">
                                 <HugeiconsIcon icon={SparklesIcon} className="h-5 w-5 shrink-0" />
