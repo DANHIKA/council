@@ -2,7 +2,7 @@
 
 import { useState, useEffect } from "react";
 import { useSession } from "@/hooks/useSession";
-import { useRouter } from "next/navigation";
+import { useRouter, useParams } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
@@ -32,10 +32,12 @@ const TIMELINE_COLORS: Record<string, string> = {
     PENDING_APPROVAL: "bg-purple-500",
 };
 
-export default function OfficerReviewPage({ params }: { params: Promise<{ id: string }> }) {
+export default function OfficerReviewPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
-    const [resolvedParams, setResolvedParams] = useState<{ id: string } | null>(null);
+    const params = useParams<{ id: string }>();
+    const id = params?.id ?? "";
+
     const [decisionNotes, setDecisionNotes] = useState("");
     const [isSubmitting, setIsSubmitting] = useState(false);
     const [showHistory, setShowHistory] = useState(false);
@@ -43,9 +45,8 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
     const [aiSummary, setAiSummary] = useState<string | null>(null);
 
     const { isStaff, isAdmin } = usePermissions();
-    const userRole = (session?.user as any)?.role;
 
-    const { data: application, isLoading, error } = useOfficerApplication(resolvedParams?.id || "");
+    const { data: application, isLoading, error } = useOfficerApplication(id);
 
     const assignMutation = useAssignOfficer();
     const approveMutation = useApproveApplication();
@@ -56,15 +57,10 @@ export default function OfficerReviewPage({ params }: { params: Promise<{ id: st
         if (status === "loading") return;
         if (!session || !isStaff) {
             router.push("/dashboard");
-            return;
         }
-        (async () => {
-            const p = await params;
-            setResolvedParams(p);
-        })();
-    }, [status, session, isStaff, router, params]);
+    }, [status, session, isStaff, router]);
 
-    if (status === "loading" || !resolvedParams) return null;
+    if (status === "loading") return null;
     if (!session || !isStaff) return null;
 
     if (isLoading) {

@@ -1,7 +1,6 @@
 "use client";
 
 import { useSession } from "@/hooks/useSession";
-import { useEffect } from "react";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -131,7 +130,7 @@ function ApplicationDetails({ id }: { id: string }) {
 export default function DashboardPage() {
     const { data: session, status } = useSession();
     const router = useRouter();
-    const { isApplicant, isStaff } = usePermissions();
+    const { isApplicant, isStaff, isAdmin } = usePermissions();
     const { data: notificationsData, isLoading: loadingNotifications } = useNotifications();
 
     const { data: listData, isLoading, error } = useApplications({ limit: 100 });
@@ -159,11 +158,27 @@ export default function DashboardPage() {
         .slice(0, 8)
         .map(([name, count]) => ({ name, count }));
 
-    if (status === "loading") return null;
+    if (status === "loading") {
+        return (
+            <div className="flex items-center justify-center min-h-[50vh]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
 
     if (!session) {
         router.push("/auth/login");
         return null;
+    }
+
+    // Redirect admin users to admin dashboard
+    if (isAdmin) {
+        router.replace("/admin");
+        return (
+            <div className="flex items-center justify-center min-h-[50vh]">
+                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+            </div>
+        );
     }
 
     const recentApplications = applications.slice(0, 5);

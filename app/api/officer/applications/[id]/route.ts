@@ -21,28 +21,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
             include: {
                 applicant: { select: { id: true, name: true, email: true, phone: true, organization: true } },
                 officer: { select: { id: true, name: true, email: true } },
-                permitTypeRef: {
-                    include: {
-                        requirements: {
-                            orderBy: { sortOrder: "asc" },
-                            include: {
-                                documents: {
-                                    where: { applicationId: id },
-                                    select: {
-                                        id: true,
-                                        name: true,
-                                        fileUrl: true,
-                                        fileType: true,
-                                        fileSize: true,
-                                        status: true,
-                                        reviewNotes: true,
-                                        createdAt: true,
-                                    },
-                                },
-                            },
-                        },
-                    },
-                },
+                permitTypeRef: { select: { id: true, name: true, code: true } },
                 documents: { include: { requirement: { select: { key: true, label: true } } } },
                 comments: {
                     include: { author: { select: { id: true, name: true, role: true } } },

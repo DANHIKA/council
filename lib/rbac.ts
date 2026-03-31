@@ -125,7 +125,18 @@ export function canAccessRoute(role: UserRole | undefined, pathname: string): bo
 /** Returns the nav items visible to the given role. */
 export function getNavItems(role: UserRole | undefined) {
     if (!role) return [];
-    return NAV_ITEMS.filter((item) =>
+    const items = NAV_ITEMS.filter((item) =>
         item.roles === null || item.roles.includes(role)
     );
+    
+    // For admin users, put Admin Dashboard first
+    if (role === "ADMIN") {
+        const adminIndex = items.findIndex(item => item.href === "/admin");
+        if (adminIndex > 0) {
+            const [adminItem] = items.splice(adminIndex, 1);
+            items.unshift(adminItem);
+        }
+    }
+    
+    return items;
 }
