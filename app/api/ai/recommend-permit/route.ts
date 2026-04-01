@@ -1,90 +1,78 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
-import { generate, getProvider } from "@/lib/ai-provider";
+import { generate } from "@/lib/ai-provider";
 import { getRelevantScenarios } from "@/lib/ai-scenarios";
 
-type AIProvider = "groq" | "gemini" | "ollama";
-
 export async function POST(req: NextRequest) {
-    let provider: AIProvider | undefined;
-    
-    try {
-        const body = await req.json();
-        provider = body.provider as AIProvider | undefined;
-        const { description } = body;
+  try {
+    const body = await req.json();
+    const { description, provider } = body;
 
-        if (!description) {
-            return NextResponse.json({ error: "Description is required" }, { status: 400 });
-        }
-
-        const permitTypes = await prisma.permitType.findMany({
-            select: { name: true, description: true }
-        }) as { name: string; description: string | null }[];
-
-        const relevantScenarios = getRelevantScenarios(description);
-        const scenarioText = relevantScenarios
-            .map(s => `User described: "${s.query}"\nCorrect permit: {"recommendation": "${s.recommendation}", "explanation": "${s.explanation}"}`)
-            .join("\n\n");
-
-        const permitList = permitTypes.map(pt => `- ${pt.name}: ${pt.description}`).join("\n");
-
-        // Simplified prompt for smaller models
-        const prompt = `Permit types: ${permitList}
-
-Examples:
-${scenarioText}
-
-User wants: "${description}"
-
-What permit is needed? Reply with just the permit name.`;
-
-        const responseText = await generate(prompt, 512, provider);
-        console.log(`${provider || getProvider()} recommend response:`, responseText);
-
-        try {
-            // Try to find a matching permit type in the response
-            const normalizedResponse = responseText.toLowerCase();
-            const foundPermit = permitTypes.find(pt =>
-                normalizedResponse.includes(pt.name.toLowerCase())
-            );
-
-            if (foundPermit) {
-                return NextResponse.json({
-                    recommendation: foundPermit.name,
-                    explanation: "Recommended based on your project description."
-                });
-            }
-
-            // Fallback: check if any permit name appears in the response
-            for (const pt of permitTypes) {
-                if (normalizedResponse.includes(pt.name.toLowerCase())) {
-                    return NextResponse.json({
-                        recommendation: pt.name,
-                        explanation: "Matched based on your project description."
-                    });
-                }
-            }
-
-            throw new Error("No matching permit found in AI response");
-        } catch (parseError) {
-            console.error("Failed to parse AI response:", responseText, parseError);
-            return NextResponse.json({
-                recommendation: "Manual Selection Required",
-                explanation: "Could not automatically determine the permit type. Please select one from the list above."
-            });
-        }
-    } catch (error: any) {
-        console.error("Permit recommendation error:", error);
-
-        const providerForError = provider || getProvider();
-        const isServiceError = error?.message?.includes("API") || error?.message?.includes("connection") || error?.message?.includes(providerForError);
-        if (isServiceError) {
-            return NextResponse.json({
-                recommendation: "AI Unavailable",
-                explanation: "The AI service is temporarily unavailable. Please wait a moment and try again, or select a permit type manually."
-            }, { status: 503 });
-        }
-
-        return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+    if (!description) {
+      return NextResponse.json({ error: "Description is required" }, { status: 400 });
     }
+
+    const permitTypes = await prisma.permitType.findMany({
+      select: { name: true, description: true },
+    }) as { name: string; description: string | null }[];
+
+    const scenarios = getRelevantScenarios(description)
+      .map(s => `Project: "${s.query}" → ${s.recommendation} (${s.explanation})`)
+      .join("\n");
+
+    const permitList = permitTypes.map(p => `- ${p.name}: ${p.description ?? ""}`).join("\n");
+
+    const prompt = `You are a council permit advisor. Based on the project description, recommend the most appropriate permit and explain why in a friendly, helpful way.
+
+Available permits:
+${permitList}
+
+Similar past cases:
+${scenarios}
+
+Project: "${description}"
+
+Reply with JSON only — no markdown, no extra text:
+{"recommendation": "<exact permit name from the list>", "explanation": "<2-3 sentence natural explanation — why this permit fits, what it covers, and what to expect>"}`;
+
+    const raw = await generate(prompt, 200, provider);
+
+    // Extract JSON even if the model wraps it in markdown
+    const jsonMatch = raw.match(/\{[\s\S]*\}/);
+    if (jsonMatch) {
+      try {
+        const parsed = JSON.parse(jsonMatch[0]);
+        // Validate the recommendation is a real permit name
+        const matched = permitTypes.find(
+          p => p.name.toLowerCase() === (parsed.recommendation ?? "").toLowerCase()
+        );
+        if (matched) {
+          return NextResponse.json({
+            recommendation: matched.name,
+            explanation: parsed.explanation ?? "This permit fits your project description.",
+          });
+        }
+      } catch {
+        // fall through to name-matching below
+      }
+    }
+
+    // Safety net: find any permit name mentioned in the response
+    const lower = raw.toLowerCase();
+    const found = permitTypes.find(p => lower.includes(p.name.toLowerCase()));
+    if (found) {
+      return NextResponse.json({
+        recommendation: found.name,
+        explanation: "This permit matches your project description.",
+      });
+    }
+
+    return NextResponse.json({
+      recommendation: "Manual Selection Required",
+      explanation: "I wasn't able to pinpoint the exact permit from your description. Have a look at the list above and pick the one that best fits — or add a bit more detail and try again.",
+    });
+  } catch (error: any) {
+    console.error("Permit recommendation error:", error);
+    return NextResponse.json({ error: "Internal server error" }, { status: 500 });
+  }
 }
