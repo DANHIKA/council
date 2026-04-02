@@ -12,6 +12,7 @@ import {
     Location01Icon,
     DashboardCircleIcon,
     File02Icon,
+    Chat01Icon,
 } from "@hugeicons/core-free-icons";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -22,6 +23,7 @@ const ICON_MAP = {
     Location01Icon,
     DashboardCircleIcon,
     File02Icon,
+    Chat01Icon,
 } as const;
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}

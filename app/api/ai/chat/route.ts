@@ -9,6 +9,11 @@ import type { Message } from "@/lib/ai-provider";
 const INTENTS = ["greeting", "permit_recommendation", "document_requirements", "conversation"] as const;
 type Intent = typeof INTENTS[number];
 
+const VISUALIZATION_INTENTS = [
+  "chart_permit_types", "table_permit_types", "table_requirements", "stats_summary",
+] as const;
+type VisualizationIntent = typeof VISUALIZATION_INTENTS[number] | null;
+
 async function classifyIntent(msg: string): Promise<Intent> {
   const prompt = `Classify this message from a permit applicant into exactly one intent. Reply with ONLY the intent name.
 
@@ -24,7 +29,122 @@ Message: "${msg}"`;
   return (INTENTS as readonly string[]).includes(raw) ? (raw as Intent) : "conversation";
 }
 
+async function classifyVisualization(msg: string): Promise<VisualizationIntent> {
+  const prompt = `Does this message request a chart, table, or statistics visualization about permits? Reply with ONLY the intent name or "none".
+
+Visualization intents:
+chart_permit_types   – bar/pie chart showing available permit types
+table_permit_types   – table of all permit types with descriptions
+table_requirements   – table showing document requirements for permits
+stats_summary        – summary statistics about permits
+
+Message: "${msg}"`;
+
+  const raw = (await generate(prompt, 20)).trim().toLowerCase();
+  return (VISUALIZATION_INTENTS as readonly string[]).includes(raw) ? (raw as VisualizationIntent) : null;
+}
+
 // ── Data fetchers ─────────────────────────────────────────────────────────────
+
+async function fetchVisualizationData(intent: VisualizationIntent): Promise<any> {
+  switch (intent) {
+    case "chart_permit_types": {
+      const permitTypes = await prisma.permitType.findMany({
+        include: { _count: { select: { applications: true } } },
+        orderBy: { name: "asc" },
+      });
+      const data = permitTypes
+        .map((p) => ({ name: p.name, value: p._count.applications || 0 }))
+        .filter((d) => d.value > 0);
+      
+      if (data.length === 0) {
+        return {
+          type: "chart",
+          chart: {
+            title: "Permit Types",
+            type: "bar" as const,
+            data: [{ name: "No applications", value: 1 }],
+          },
+        };
+      }
+      
+      return {
+        type: "chart",
+        chart: {
+          title: "Applications by Permit Type",
+          type: "horizontalBar" as const,
+          data,
+        },
+      };
+    }
+
+    case "table_permit_types": {
+      const permitTypes = await prisma.permitType.findMany({
+        orderBy: { name: "asc" },
+      });
+      return {
+        type: "table",
+        table: {
+          title: "Available Permit Types",
+          columns: [
+            { key: "name", header: "Permit Type" },
+            { key: "description", header: "Description" },
+          ],
+          data: permitTypes.map((p) => ({
+            name: p.name,
+            description: p.description || "No description",
+          })),
+        },
+      };
+    }
+
+    case "table_requirements": {
+      const permitTypes = await prisma.permitType.findMany({
+        include: { requirements: { select: { label: true, required: true } } },
+        orderBy: { name: "asc" },
+      });
+      const data = permitTypes.flatMap((p) =>
+        p.requirements.map((r) => ({
+          permitType: p.name,
+          requirement: r.label,
+          type: r.required ? "Required" : "Optional",
+        }))
+      );
+      return {
+        type: "table",
+        table: {
+          title: "Permit Requirements",
+          columns: [
+            { key: "permitType", header: "Permit Type" },
+            { key: "requirement", header: "Requirement" },
+            { key: "type", header: "Type", type: "badge" as const },
+          ],
+          data,
+        },
+      };
+    }
+
+    case "stats_summary": {
+      const [totalPermits, totalRequirements, activePermits] = await Promise.all([
+        prisma.permitType.count(),
+        prisma.permitRequirement.count(),
+        prisma.permitApplication.count({ where: { status: { in: ["SUBMITTED", "UNDER_REVIEW", "PENDING_APPROVAL"] } } }),
+      ]);
+      return {
+        type: "stats",
+        stats: [
+          { label: "Permit Types", value: totalPermits },
+          { label: "Total Requirements", value: totalRequirements },
+          { label: "Active Applications", value: activePermits },
+          { label: "Available", value: "24/7" },
+        ],
+      };
+    }
+
+    default:
+      return null;
+  }
+}
 
 async function fetchPermitData(description: string) {
   const permitTypes = await prisma.permitType.findMany({
@@ -62,7 +182,7 @@ const SYSTEM_PROMPT =
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, provider } = body;
+    const { messages, provider, includeVisualization } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Messages are required" }, { status: 400 });
@@ -74,7 +194,16 @@ export async function POST(req: NextRequest) {
     // 1. Classify intent
     const intent = await classifyIntent(lastMessage);
 
-    // 2. Fetch relevant data and build enriched system prompt
+    // 2. Check for visualization request if enabled
+    let visualizationData: any = null;
+    if (includeVisualization) {
+      const vizIntent = await classifyVisualization(lastMessage);
+      if (vizIntent) {
+        visualizationData = await fetchVisualizationData(vizIntent);
+      }
+    }
+
+    // 3. Fetch relevant data and build enriched system prompt
     let systemWithData = SYSTEM_PROMPT;
 
     if (intent === "permit_recommendation") {
@@ -95,14 +224,17 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 3. AI writes the response
+    // 4. AI writes the response
     const response = await chat(
       [{ role: "system", content: systemWithData }, ...(messages as Message[])],
       150,
       provider
     );
 
-    return NextResponse.json({ response });
+    return NextResponse.json({ 
+      response,
+      visualization: visualizationData,
+    });
   } catch (error: any) {
     console.error("AI Chat error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

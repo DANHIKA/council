@@ -54,10 +54,6 @@ export async function POST(req: NextRequest) {
                     paychanguTxId: paychanguTxId ?? payment.paychanguTxId,
                 },
             }),
-            prisma.permitApplication.update({
-                where: { id: payment.application.id },
-                data: { paymentStatus: newStatus },
-            }),
         ]);
 
         if (isSuccess) {

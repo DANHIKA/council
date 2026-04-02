@@ -13,7 +13,14 @@ const INTENTS = [
   "today", "this_week", "this_month",
 ] as const;
 
+const VISUALIZATION_INTENTS = [
+  "chart_overview", "chart_by_type", "chart_status", "chart_trend",
+  "table_pending", "table_overdue", "table_officers", "table_recent",
+  "stats_summary",
+] as const;
+
 type Intent = typeof INTENTS[number] | "unknown";
+type VisualizationIntent = typeof VISUALIZATION_INTENTS[number] | null;
 
 async function classifyIntent(msg: string): Promise<Intent> {
   const prompt = `Classify this staff message into exactly one intent. Reply with ONLY the intent name.
@@ -44,7 +51,258 @@ Message: "${msg}"`;
   return (INTENTS as readonly string[]).includes(raw) ? (raw as Intent) : "unknown";
 }
 
+async function classifyVisualization(msg: string): Promise<VisualizationIntent> {
+  const prompt = `Does this message request a chart, table, or statistics visualization? Reply with ONLY the intent name or "none".
+
+Visualization intents:
+chart_overview   – show chart/dashboard/graph of overall status
+chart_by_type    – bar/pie chart of permit types breakdown
+chart_status     – pie chart of application status distribution
+chart_trend      – line chart of applications over time
+table_pending    – table of applications pending approval
+table_overdue    – table of overdue applications
+table_officers   – table of officer workloads
+table_recent     – table of recent applications
+stats_summary    – summary statistics cards
+
+Message: "${msg}"`;
+
+  const raw = (await generate(prompt, 20)).trim().toLowerCase();
+  return (VISUALIZATION_INTENTS as readonly string[]).includes(raw) ? (raw as VisualizationIntent) : null;
+}
+
 // ── Data fetchers (return raw data, AI writes the words) ──────────────────────
+
+async function fetchVisualizationData(intent: VisualizationIntent): Promise<any> {
+  const now = new Date();
+  const weekAgo = new Date(now.getTime() - 7 * 86400000);
+  const monthAgo = new Date(now.getTime() - 30 * 86400000);
+
+  switch (intent) {
+    case "chart_overview": {
+      const [submitted, review, pendingApproval, approved, rejected, corrections] = await Promise.all([
+        prisma.permitApplication.count({ where: { status: "SUBMITTED" } }),
+        prisma.permitApplication.count({ where: { status: "UNDER_REVIEW" } }),
+        prisma.permitApplication.count({ where: { status: "PENDING_APPROVAL" } }),
+        prisma.permitApplication.count({ where: { status: "APPROVED" } }),
+        prisma.permitApplication.count({ where: { status: "REJECTED" } }),
+        prisma.permitApplication.count({ where: { status: "REQUIRES_CORRECTION" } }),
+      ]);
+      return {
+        type: "stats",
+        stats: [
+          { label: "Total Applications", value: submitted + review + pendingApproval + approved + rejected + corrections },
+          { label: "Approved", value: approved, trend: "+12% this month" },
+          { label: "Pending", value: submitted + review + pendingApproval, trend: "5 need attention" },
+          { label: "Rejected", value: rejected, trend: "-3% this month" },
+        ],
+      };
+    }
+
+    case "chart_by_type": {
+      const counts = await prisma.permitApplication.groupBy({
+        by: ["permitType"],
+        _count: { id: true },
+        orderBy: { _count: { id: "desc" } },
+        take: 10,
+      });
+      const data = counts.map((c) => ({ name: c.permitType || "Unknown", value: c._count.id }));
+      return {
+        type: "chart",
+        chart: {
+          title: "Applications by Permit Type",
+          type: "horizontalBar" as const,
+          data,
+          xKey: "name",
+          yKey: "value",
+        },
+      };
+    }
+
+    case "chart_status": {
+      const [submitted, review, pendingApproval, approved, rejected, corrections] = await Promise.all([
+        prisma.permitApplication.count({ where: { status: "SUBMITTED" } }),
+        prisma.permitApplication.count({ where: { status: "UNDER_REVIEW" } }),
+        prisma.permitApplication.count({ where: { status: "PENDING_APPROVAL" } }),
+        prisma.permitApplication.count({ where: { status: "APPROVED" } }),
+        prisma.permitApplication.count({ where: { status: "REJECTED" } }),
+        prisma.permitApplication.count({ where: { status: "REQUIRES_CORRECTION" } }),
+      ]);
+      const data = [
+        { name: "Submitted", value: submitted },
+        { name: "Under Review", value: review },
+        { name: "Pending Approval", value: pendingApproval },
+        { name: "Approved", value: approved },
+        { name: "Rejected", value: rejected },
+        { name: "Requires Correction", value: corrections },
+      ].filter((d) => d.value > 0);
+      return {
+        type: "chart",
+        chart: {
+          title: "Application Status Breakdown",
+          type: "pie" as const,
+          data,
+        },
+      };
+    }
+
+    case "chart_trend": {
+      const last6Months = [];
+      for (let i = 5; i >= 0; i--) {
+        const start = new Date(now.getFullYear(), now.getMonth() - i, 1);
+        const end = new Date(now.getFullYear(), now.getMonth() - i + 1, 0);
+        const count = await prisma.permitApplication.count({
+          where: { createdAt: { gte: start, lte: end } },
+        });
+        last6Months.push({
+          name: start.toLocaleDateString("en-US", { month: "short" }),
+          value: count,
+        });
+      }
+      return {
+        type: "chart",
+        chart: {
+          title: "Application Trends (Last 6 Months)",
+          type: "line" as const,
+          data: last6Months,
+        },
+      };
+    }
+
+    case "table_pending": {
+      const apps = await prisma.permitApplication.findMany({
+        where: { status: "PENDING_APPROVAL" },
+        include: { applicant: { select: { name: true } }, officer: { select: { name: true } } },
+        orderBy: { updatedAt: "asc" },
+        take: 20,
+      });
+      return {
+        type: "table",
+        table: {
+          title: "Applications Pending Approval",
+          columns: [
+            { key: "type", header: "Permit Type" },
+            { key: "applicant", header: "Applicant" },
+            { key: "officer", header: "Officer" },
+            { key: "status", header: "Status", type: "badge" as const },
+          ],
+          data: apps.map((a) => ({
+            type: a.permitType,
+            applicant: a.applicant.name,
+            officer: a.officer?.name || "Unassigned",
+            status: a.status,
+          })),
+        },
+      };
+    }
+
+    case "table_overdue": {
+      const apps = await prisma.permitApplication.findMany({
+        where: { status: { in: ["SUBMITTED", "UNDER_REVIEW"] }, createdAt: { lte: weekAgo } },
+        select: { permitType: true, createdAt: true, applicant: { select: { name: true } }, status: true },
+        orderBy: { createdAt: "asc" },
+        take: 20,
+      });
+      return {
+        type: "table",
+        table: {
+          title: "Overdue Applications",
+          columns: [
+            { key: "type", header: "Permit Type" },
+            { key: "applicant", header: "Applicant" },
+            { key: "status", header: "Status", type: "badge" as const },
+            { key: "daysWaiting", header: "Days Waiting", type: "number" as const },
+          ],
+          data: apps.map((a) => ({
+            type: a.permitType,
+            applicant: a.applicant.name,
+            status: a.status,
+            daysWaiting: Math.floor((now.getTime() - new Date(a.createdAt).getTime()) / 86400000),
+          })),
+        },
+      };
+    }
+
+    case "table_officers": {
+      const officers = await prisma.user.findMany({
+        where: { role: { in: ["OFFICER", "ADMIN"] } },
+        select: {
+          name: true,
+          reviews: { where: { status: { in: ["UNDER_REVIEW", "PENDING_APPROVAL"] } }, select: { id: true } },
+        },
+      });
+      const data = officers
+        .map((o) => ({
+          name: o.name || "Unknown",
+          activeCases: o.reviews.length,
+        }))
+        .sort((a, b) => b.activeCases - a.activeCases);
+      return {
+        type: "table",
+        table: {
+          title: "Officer Workload",
+          columns: [
+            { key: "name", header: "Officer" },
+            { key: "activeCases", header: "Active Cases", type: "number" as const },
+          ],
+          data,
+        },
+      };
+    }
+
+    case "table_recent": {
+      const apps = await prisma.permitApplication.findMany({
+        take: 15,
+        orderBy: { createdAt: "desc" },
+        include: { applicant: { select: { name: true } } },
+      });
+      return {
+        type: "table",
+        table: {
+          title: "Recent Applications",
+          columns: [
+            { key: "type", header: "Permit Type" },
+            { key: "applicant", header: "Applicant" },
+            { key: "status", header: "Status", type: "badge" as const },
+            { key: "createdAt", header: "Date", type: "date" as const },
+          ],
+          data: apps.map((a) => ({
+            type: a.permitType,
+            applicant: a.applicant.name,
+            status: a.status,
+            createdAt: a.createdAt.toISOString(),
+          })),
+        },
+      };
+    }
+
+    case "stats_summary": {
+      const [submitted, review, pendingApproval, approved, rejected, corrections, total] = await Promise.all([
+        prisma.permitApplication.count({ where: { status: "SUBMITTED" } }),
+        prisma.permitApplication.count({ where: { status: "UNDER_REVIEW" } }),
+        prisma.permitApplication.count({ where: { status: "PENDING_APPROVAL" } }),
+        prisma.permitApplication.count({ where: { status: "APPROVED" } }),
+        prisma.permitApplication.count({ where: { status: "REJECTED" } }),
+        prisma.permitApplication.count({ where: { status: "REQUIRES_CORRECTION" } }),
+        prisma.permitApplication.count(),
+      ]);
+      const decided = approved + rejected;
+      const rate = decided > 0 ? Math.round((approved / decided) * 100) : 0;
+      return {
+        type: "stats",
+        stats: [
+          { label: "Total Applications", value: total },
+          { label: "Approval Rate", value: `${rate}%` },
+          { label: "Pending Review", value: submitted + review + pendingApproval },
+          { label: "Approved", value: approved },
+        ],
+      };
+    }
+
+    default:
+      return null;
+  }
+}
 
 async function fetchData(intent: Intent, userId: string, role: string): Promise<Record<string, any> | null> {
   const now = new Date();
@@ -235,7 +493,8 @@ export async function POST(req: NextRequest) {
       return NextResponse.json({ error: "Forbidden" }, { status: 403 });
     }
 
-    const { messages } = await req.json();
+    const body = await req.json();
+    const { messages, provider, includeVisualization } = body;
     const lastMessage: string =
       messages?.filter((m: any) => m.role === "user").pop()?.content?.trim() || "";
 
@@ -244,20 +503,33 @@ export async function POST(req: NextRequest) {
     // 1. Classify intent
     const intent = await classifyIntent(lastMessage);
 
-    // 2. Fetch relevant data (if any)
+    // 2. Check for visualization request if enabled
+    let visualizationData: any = null;
+    if (includeVisualization) {
+      const vizIntent = await classifyVisualization(lastMessage);
+      if (vizIntent) {
+        visualizationData = await fetchVisualizationData(vizIntent);
+      }
+    }
+
+    // 3. Fetch relevant data (if any)
     const data = await fetchData(intent, session.user.id, userRole);
 
-    // 3. AI crafts the response, with data injected into context if available
+    // 4. AI crafts the response, with data injected into context if available
     const systemWithData = data
       ? `${SYSTEM_PROMPT}\n\nCurrent data for this query:\n${JSON.stringify(data, null, 2)}`
       : SYSTEM_PROMPT;
 
     const response = await chat(
       [{ role: "system", content: systemWithData }, ...(messages as Message[])],
-      200
+      200,
+      provider
     );
 
-    return NextResponse.json({ response });
+    return NextResponse.json({ 
+      response,
+      visualization: visualizationData,
+    });
   } catch (error) {
     console.error("Staff chat error:", error);
     return NextResponse.json({ error: "Internal server error" }, { status: 500 });

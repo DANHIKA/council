@@ -48,10 +48,6 @@ export async function GET(req: NextRequest) {
                         paychanguTxId: paychanguTxId ?? verifyData?.data?.id ?? null,
                     },
                 }),
-                prisma.permitApplication.update({
-                    where: { id: applicationId },
-                    data: { paymentStatus: "PAID" },
-                }),
             ]);
 
             return NextResponse.redirect(

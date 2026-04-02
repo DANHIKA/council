@@ -48,7 +48,7 @@ export async function GET(req: NextRequest, { params }: { params: Promise<{ id: 
                 },
                 certificate: true,
                 timeline: { orderBy: { createdAt: "asc" } },
-                payment: { select: { id: true, txRef: true, amount: true, currency: true, status: true, createdAt: true } },
+                payments: { select: { id: true, txRef: true, amount: true, currency: true, status: true, createdAt: true } },
             },
         });
 
