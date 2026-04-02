@@ -33,6 +33,8 @@ type RequirementDef = {
 type PermitTypeDef = {
     name: string;
     description?: string;
+    applicationFee?: number;  // Non-refundable processing fee (MWK)
+    permitFee?: number;       // Main permit fee after approval (MWK)
     requirements: RequirementDef[];
 };
 
@@ -79,6 +81,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Building Construction",
         description: "Construction or extension of buildings/structures.",
+        applicationFee: 5000,  // MWK 5,000 - Non-refundable processing fee
+        permitFee: 50000,      // MWK 50,000 - Main permit fee after approval
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -104,6 +108,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Demolition",
         description: "Demolition of existing structures.",
+        applicationFee: 3000,  // MWK 3,000
+        permitFee: 25000,      // MWK 25,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -129,6 +135,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Electrical Installation",
         description: "Electrical wiring, installations, and upgrades.",
+        applicationFee: 2000,  // MWK 2,000
+        permitFee: 15000,      // MWK 15,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -154,6 +162,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Plumbing",
         description: "Plumbing installation or modification.",
+        applicationFee: 2000,  // MWK 2,000
+        permitFee: 15000,      // MWK 15,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -179,6 +189,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Land Use Change",
         description: "Change of land use / zoning.",
+        applicationFee: 10000, // MWK 10,000
+        permitFee: 100000,     // MWK 100,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -204,6 +216,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Business License",
         description: "Licensing for operating a business.",
+        applicationFee: 5000,  // MWK 5,000
+        permitFee: 30000,      // MWK 30,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -229,6 +243,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Outdoor Advertising",
         description: "Billboards, signage, and outdoor advertising.",
+        applicationFee: 3000,  // MWK 3,000
+        permitFee: 20000,      // MWK 20,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -254,6 +270,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Environmental Impact",
         description: "Environmental impact screening/assessment.",
+        applicationFee: 15000, // MWK 15,000
+        permitFee: 75000,      // MWK 75,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -279,6 +297,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Road Excavation",
         description: "Excavation works affecting roads/sidewalks.",
+        applicationFee: 5000,  // MWK 5,000
+        permitFee: 40000,      // MWK 40,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -304,6 +324,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Event Permit",
         description: "Public or private events requiring council approval.",
+        applicationFee: 2000,  // MWK 2,000
+        permitFee: 10000,      // MWK 10,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -338,6 +360,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Food Handling",
         description: "Food handling / food premises compliance.",
+        applicationFee: 2000,  // MWK 2,000
+        permitFee: 12000,      // MWK 12,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -363,6 +387,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Liquor License",
         description: "Liquor trading license-related applications.",
+        applicationFee: 10000, // MWK 10,000
+        permitFee: 100000,     // MWK 100,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -388,6 +414,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Telecommunications",
         description: "Telecom infrastructure installations.",
+        applicationFee: 15000, // MWK 15,000
+        permitFee: 80000,      // MWK 80,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -413,6 +441,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Water & Sewer Connection",
         description: "New or modified water/sewer connections.",
+        applicationFee: 3000,  // MWK 3,000
+        permitFee: 25000,      // MWK 25,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -438,6 +468,8 @@ const PERMIT_TYPES: PermitTypeDef[] = [
     {
         name: "Other",
         description: "Other permit applications.",
+        applicationFee: 1000,  // MWK 1,000
+        permitFee: 5000,       // MWK 5,000
         requirements: [
             ...DEFAULT_REQUIREMENTS,
             {
@@ -462,11 +494,15 @@ async function upsertPermitTypesAndRequirements() {
             update: {
                 name: permitType.name,
                 description: permitType.description,
+                applicationFee: permitType.applicationFee ?? 0,
+                permitFee: permitType.permitFee ?? 0,
             },
             create: {
                 code,
                 name: permitType.name,
                 description: permitType.description,
+                applicationFee: permitType.applicationFee ?? 0,
+                permitFee: permitType.permitFee ?? 0,
             },
         });
 

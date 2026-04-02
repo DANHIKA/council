@@ -1,7 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { randomUUID } from "crypto";
 
 const PAYCHANGU_API = "https://api.paychangu.com/payment";
 
@@ -71,9 +70,11 @@ export async function POST(req: NextRequest) {
         // Call Paychangu Standard Checkout API
         const response = await fetch(PAYCHANGU_API, {
             method: "POST",
-            headers: { "Content-Type": "application/json" },
+            headers: {
+                "Content-Type": "application/json",
+                "Authorization": `Bearer ${process.env.PAYCHANGU_SECRET_KEY}`,
+            },
             body: JSON.stringify({
-                secret_key: process.env.PAYCHANGU_SECRET_KEY,
                 callback_url: `${appUrl}/api/payments/callback`,
                 return_url: `${appUrl}/applications/${applicationId}?payment=cancelled`,
                 currency,
@@ -82,7 +83,11 @@ export async function POST(req: NextRequest) {
                 first_name: nameParts[0] ?? "Applicant",
                 last_name: nameParts.slice(1).join(" ") || "-",
                 email: application.applicant.email,
-                metadata: { applicationId },
+                customization: {
+                    title: `${application.permitTypeRef?.name ?? "Permit"} - Application Fee`,
+                    description: `Payment for ${application.permitTypeRef?.name ?? "permit"} application`,
+                },
+                meta: { applicationId },
             }),
         });
 

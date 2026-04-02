@@ -46,19 +46,25 @@ enum PaymentStatus {
   WAIVED
 }
 
-model PermitType {
-  id           String             @id @default(cuid())
-  code         String             @unique
-  name         String
-  description  String?            @db.Text
-  fee          Decimal            @default(0) @db.Decimal(10, 2)
-  currency     String             @default("MWK")
-  department   Department         @default(GENERAL)
-  createdAt    DateTime           @default(now())
-  updatedAt    DateTime           @updatedAt
+enum PaymentType {
+  APPLICATION
+  PERMIT
+}
 
-  requirements PermitRequirement[]
-  applications PermitApplication[]
+model PermitType {
+  id              String             @id @default(cuid())
+  code            String             @unique
+  name            String
+  description     String?            @db.Text
+  applicationFee  Decimal            @default(0) @db.Decimal(10, 2)
+  permitFee       Decimal            @default(0) @db.Decimal(10, 2)
+  currency        String             @default("MWK")
+  department      Department         @default(GENERAL)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  requirements    PermitRequirement[]
+  applications    PermitApplication[]
 }
 
 model PermitRequirement {
@@ -166,8 +172,7 @@ model PermitApplication {
   comments      Comment[]
   certificate   Certificate?
   timeline      TimelineEvent[]
-  payment       Payment?
-  paymentStatus PaymentStatus @default(PENDING)
+  payments      Payment[]
   reviewTokens  ReviewToken[]
 }
 
@@ -225,14 +230,17 @@ model TimelineEvent {
 model Payment {
   id            String        @id @default(cuid())
   txRef         String        @unique
+  type          PaymentType   @default(APPLICATION)
   amount        Decimal       @db.Decimal(10, 2)
   currency      String        @default("MWK")
   status        PaymentStatus @default(PENDING)
   paychanguTxId String?
-  applicationId String        @unique
+  applicationId String
   application   PermitApplication @relation(fields: [applicationId], references: [id], onDelete: Cascade)
   createdAt     DateTime      @default(now())
   updatedAt     DateTime      @updatedAt
+
+  @@unique([applicationId, type])
 }
 
 model Notification {
