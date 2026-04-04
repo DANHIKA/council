@@ -3,6 +3,7 @@ import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generate, chat } from "@/lib/ai-provider";
 import type { Message } from "@/lib/ai-provider";
+import type { ProposedAction, ActionType } from "@/components/chat/action-card";
 
 // ── Intent classification ─────────────────────────────────────────────────────
 
@@ -19,8 +20,14 @@ const VISUALIZATION_INTENTS = [
   "stats_summary",
 ] as const;
 
+const ACTION_INTENTS = [
+  "officer_approve", "officer_reject", "officer_corrections",
+  "officer_assign", "admin_signoff", "admin_reject_final", "summarize",
+] as const;
+
 type Intent = typeof INTENTS[number] | "unknown";
 type VisualizationIntent = typeof VISUALIZATION_INTENTS[number] | null;
+type ActionIntent = typeof ACTION_INTENTS[number] | null;
 
 async function classifyIntent(msg: string): Promise<Intent> {
   const prompt = `Classify this staff message into exactly one intent. Reply with ONLY the intent name.
@@ -71,12 +78,116 @@ Message: "${msg}"`;
   return (VISUALIZATION_INTENTS as readonly string[]).includes(raw) ? (raw as VisualizationIntent) : null;
 }
 
-// ── Data fetchers (return raw data, AI writes the words) ──────────────────────
+async function classifyAction(msg: string): Promise<ActionIntent> {
+  const prompt = `Does this message request an action on a specific application? Reply with ONLY the action name or "none".
+
+Actions:
+officer_approve     – recommend approval, approve this application, mark as approved
+officer_reject      – reject, deny, decline this application
+officer_corrections – request corrections, send back, needs changes
+officer_assign      – assign to me, I'll handle this, take this case
+admin_signoff       – final approval, sign off, grant permit, final sign-off approve
+admin_reject_final  – final rejection, sign off reject
+summarize           – summarize, brief me on, give me a summary of, what's this application about
+
+Message: "${msg}"`;
+
+  const raw = (await generate(prompt, 15)).trim().toLowerCase();
+  return (ACTION_INTENTS as readonly string[]).includes(raw) ? (raw as ActionIntent) : null;
+}
+
+// ── Application resolver ──────────────────────────────────────────────────────
+
+type StatusFilter = { status?: any };
+
+function statusFilterForAction(intent: ActionIntent): StatusFilter {
+  switch (intent) {
+    case "officer_approve":
+    case "officer_reject":
+    case "officer_corrections":
+    case "officer_assign":
+      return { status: { in: ["SUBMITTED", "UNDER_REVIEW"] } };
+    case "admin_signoff":
+    case "admin_reject_final":
+      return { status: "PENDING_APPROVAL" };
+    default:
+      return {};
+  }
+}
+
+async function resolveApplication(
+  msg: string,
+  intent: ActionIntent
+): Promise<{ applicationId: string; ref: string } | null> {
+  // Use AI to extract the identifying term from the message
+  const extractPrompt = `Extract the main identifier used to reference an application from this message. It may be a person's name, a permit type, or an application ID. Reply with ONLY the extracted term, or "none".
+
+Message: "${msg}"`;
+
+  const identifier = (await generate(extractPrompt, 20)).trim().toLowerCase();
+  if (!identifier || identifier === "none") return null;
+
+  const filter = statusFilterForAction(intent);
+
+  const select = {
+    id: true,
+    permitType: true,
+    applicant: { select: { name: true } },
+  };
+
+  // Try by applicant name
+  const byName = await prisma.permitApplication.findFirst({
+    where: { applicant: { name: { contains: identifier, mode: "insensitive" } }, ...filter },
+    select,
+    orderBy: { updatedAt: "desc" },
+  });
+  if (byName) return { applicationId: byName.id, ref: `${byName.permitType} — ${byName.applicant.name}` };
+
+  // Try by permit type
+  const byType = await prisma.permitApplication.findFirst({
+    where: { permitType: { contains: identifier, mode: "insensitive" }, ...filter },
+    select,
+    orderBy: { updatedAt: "desc" },
+  });
+  if (byType) return { applicationId: byType.id, ref: `${byType.permitType} — ${byType.applicant.name}` };
+
+  // Try by ID fragment
+  const byId = await prisma.permitApplication.findFirst({
+    where: { id: { contains: identifier }, ...filter },
+    select,
+    orderBy: { updatedAt: "desc" },
+  });
+  if (byId) return { applicationId: byId.id, ref: `${byId.permitType} — ${byId.applicant.name}` };
+
+  return null;
+}
+
+function buildActionProposal(intent: ActionIntent, resolved: { applicationId: string; ref: string }): ProposedAction {
+  const map: Record<NonNullable<ActionIntent>, { type: ActionType; label: string; requiresNotes: boolean }> = {
+    officer_approve:     { type: "officer_approve",     label: "Recommend Approval",          requiresNotes: true },
+    officer_reject:      { type: "officer_reject",      label: "Reject Application",           requiresNotes: true },
+    officer_corrections: { type: "officer_corrections", label: "Request Corrections",          requiresNotes: true },
+    officer_assign:      { type: "officer_assign",      label: "Assign to Me",                 requiresNotes: false },
+    admin_signoff:       { type: "admin_signoff",       label: "Final Approval (Sign-off)",    requiresNotes: false },
+    admin_reject_final:  { type: "admin_reject_final",  label: "Final Rejection (Sign-off)",   requiresNotes: true },
+    summarize:           { type: "summarize",            label: "Summarize Application",        requiresNotes: false },
+  };
+
+  const info = map[intent!];
+  return {
+    type: info.type,
+    label: info.label,
+    description: resolved.ref,
+    applicationId: resolved.applicationId,
+    requiresNotes: info.requiresNotes,
+  };
+}
+
+// ── Visualization data fetchers ───────────────────────────────────────────────
 
 async function fetchVisualizationData(intent: VisualizationIntent): Promise<any> {
   const now = new Date();
   const weekAgo = new Date(now.getTime() - 7 * 86400000);
-  const monthAgo = new Date(now.getTime() - 30 * 86400000);
 
   switch (intent) {
     case "chart_overview": {
@@ -106,15 +217,12 @@ async function fetchVisualizationData(intent: VisualizationIntent): Promise<any>
         orderBy: { _count: { id: "desc" } },
         take: 10,
       });
-      const data = counts.map((c) => ({ name: c.permitType || "Unknown", value: c._count.id }));
       return {
         type: "chart",
         chart: {
           title: "Applications by Permit Type",
           type: "horizontalBar" as const,
-          data,
-          xKey: "name",
-          yKey: "value",
+          data: counts.map((c) => ({ name: c.permitType || "Unknown", value: c._count.id })),
         },
       };
     }
@@ -136,14 +244,7 @@ async function fetchVisualizationData(intent: VisualizationIntent): Promise<any>
         { name: "Rejected", value: rejected },
         { name: "Requires Correction", value: corrections },
       ].filter((d) => d.value > 0);
-      return {
-        type: "chart",
-        chart: {
-          title: "Application Status Breakdown",
-          type: "pie" as const,
-          data,
-        },
-      };
+      return { type: "chart", chart: { title: "Application Status Breakdown", type: "pie" as const, data } };
     }
 
     case "chart_trend": {
@@ -154,19 +255,9 @@ async function fetchVisualizationData(intent: VisualizationIntent): Promise<any>
         const count = await prisma.permitApplication.count({
           where: { createdAt: { gte: start, lte: end } },
         });
-        last6Months.push({
-          name: start.toLocaleDateString("en-US", { month: "short" }),
-          value: count,
-        });
+        last6Months.push({ name: start.toLocaleDateString("en-US", { month: "short" }), value: count });
       }
-      return {
-        type: "chart",
-        chart: {
-          title: "Application Trends (Last 6 Months)",
-          type: "line" as const,
-          data: last6Months,
-        },
-      };
+      return { type: "chart", chart: { title: "Application Trends (Last 6 Months)", type: "line" as const, data: last6Months } };
     }
 
     case "table_pending": {
@@ -231,12 +322,6 @@ async function fetchVisualizationData(intent: VisualizationIntent): Promise<any>
           reviews: { where: { status: { in: ["UNDER_REVIEW", "PENDING_APPROVAL"] } }, select: { id: true } },
         },
       });
-      const data = officers
-        .map((o) => ({
-          name: o.name || "Unknown",
-          activeCases: o.reviews.length,
-        }))
-        .sort((a, b) => b.activeCases - a.activeCases);
       return {
         type: "table",
         table: {
@@ -245,7 +330,9 @@ async function fetchVisualizationData(intent: VisualizationIntent): Promise<any>
             { key: "name", header: "Officer" },
             { key: "activeCases", header: "Active Cases", type: "number" as const },
           ],
-          data,
+          data: officers
+            .map((o) => ({ name: o.name || "Unknown", activeCases: o.reviews.length }))
+            .sort((a, b) => b.activeCases - a.activeCases),
         },
       };
     }
@@ -304,6 +391,8 @@ async function fetchVisualizationData(intent: VisualizationIntent): Promise<any>
   }
 }
 
+// ── Intent data fetchers ──────────────────────────────────────────────────────
+
 async function fetchData(intent: Intent, userId: string, role: string): Promise<Record<string, any> | null> {
   const now = new Date();
   const todayStart = new Date(now.getFullYear(), now.getMonth(), now.getDate());
@@ -337,8 +426,7 @@ async function fetchData(intent: Intent, userId: string, role: string): Promise<
     }
 
     case "count_submitted": {
-      const n = await prisma.permitApplication.count({ where: { status: "SUBMITTED" } });
-      return { submitted: n };
+      return { submitted: await prisma.permitApplication.count({ where: { status: "SUBMITTED" } }) };
     }
 
     case "count_review": {
@@ -349,20 +437,14 @@ async function fetchData(intent: Intent, userId: string, role: string): Promise<
       return { underReview: review, pendingSignoff: pending };
     }
 
-    case "count_approved": {
-      const n = await prisma.permitApplication.count({ where: { status: "APPROVED" } });
-      return { approved: n };
-    }
+    case "count_approved":
+      return { approved: await prisma.permitApplication.count({ where: { status: "APPROVED" } }) };
 
-    case "count_rejected": {
-      const n = await prisma.permitApplication.count({ where: { status: "REJECTED" } });
-      return { rejected: n };
-    }
+    case "count_rejected":
+      return { rejected: await prisma.permitApplication.count({ where: { status: "REJECTED" } }) };
 
-    case "count_correction": {
-      const n = await prisma.permitApplication.count({ where: { status: "REQUIRES_CORRECTION" } });
-      return { requiresCorrection: n };
-    }
+    case "count_correction":
+      return { requiresCorrection: await prisma.permitApplication.count({ where: { status: "REQUIRES_CORRECTION" } }) };
 
     case "count_all": {
       const [total, submitted, review, pendingApproval, approved, rejected, corrections] = await Promise.all([
@@ -481,7 +563,9 @@ async function fetchData(intent: Intent, userId: string, role: string): Promise<
 const SYSTEM_PROMPT =
   `You are a friendly, conversational council permit management assistant for staff. ` +
   `When you have data, weave it into a natural reply — don't just dump numbers. ` +
-  `Sound like a helpful colleague, not a dashboard. Keep it concise.`;
+  `Sound like a helpful colleague, not a dashboard. Keep it concise. ` +
+  `When an action has been identified (approve, reject, summarize etc.), briefly confirm what you found ` +
+  `and let the user know the action card below is ready for them to confirm.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -494,41 +578,49 @@ export async function POST(req: NextRequest) {
     }
 
     const body = await req.json();
-    const { messages, provider, includeVisualization } = body;
+    const { messages, provider, includeVisualization, includeActions } = body;
     const lastMessage: string =
       messages?.filter((m: any) => m.role === "user").pop()?.content?.trim() || "";
 
     if (!lastMessage) return NextResponse.json({ response: "What would you like to know?" });
 
-    // 1. Classify intent
-    const intent = await classifyIntent(lastMessage);
+    // 1. Run all classifiers in parallel
+    const [intent, vizIntent, actionIntent] = await Promise.all([
+      classifyIntent(lastMessage),
+      includeVisualization ? classifyVisualization(lastMessage) : Promise.resolve(null),
+      includeActions ? classifyAction(lastMessage) : Promise.resolve(null),
+    ]);
 
-    // 2. Check for visualization request if enabled
-    let visualizationData: any = null;
-    if (includeVisualization) {
-      const vizIntent = await classifyVisualization(lastMessage);
-      if (vizIntent) {
-        visualizationData = await fetchVisualizationData(vizIntent);
-      }
+    // 2. Fetch visualization data + resolve action target in parallel
+    const [visualizationData, actionResolved, intentData] = await Promise.all([
+      vizIntent ? fetchVisualizationData(vizIntent) : Promise.resolve(null),
+      actionIntent ? resolveApplication(lastMessage, actionIntent) : Promise.resolve(null),
+      fetchData(intent, session.user.id, userRole),
+    ]);
+
+    const actionData: ProposedAction | null =
+      actionIntent && actionResolved ? buildActionProposal(actionIntent, actionResolved) : null;
+
+    // 3. Build enriched system prompt
+    let systemWithData = SYSTEM_PROMPT;
+    if (intentData) {
+      systemWithData += `\n\nCurrent data:\n${JSON.stringify(intentData, null, 2)}`;
+    }
+    if (actionData) {
+      systemWithData += `\n\nAction identified: "${actionData.label}" for "${actionData.description}". Confirm this naturally and say the action card below is ready.`;
     }
 
-    // 3. Fetch relevant data (if any)
-    const data = await fetchData(intent, session.user.id, userRole);
-
-    // 4. AI crafts the response, with data injected into context if available
-    const systemWithData = data
-      ? `${SYSTEM_PROMPT}\n\nCurrent data for this query:\n${JSON.stringify(data, null, 2)}`
-      : SYSTEM_PROMPT;
-
+    // 4. Generate response
     const response = await chat(
       [{ role: "system", content: systemWithData }, ...(messages as Message[])],
       200,
       provider
     );
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       response,
       visualization: visualizationData,
+      action: actionData,
     });
   } catch (error) {
     console.error("Staff chat error:", error);

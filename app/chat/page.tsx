@@ -35,7 +35,10 @@ import { Mic, MicOff, Cpu, Trash2 } from "lucide-react";
 import { useSession } from "@/hooks/useSession";
 import { cn } from "@/lib/utils";
 import { EnhancedMessageContent } from "@/components/chat/enhanced-message";
+import { ActionCard, executeAction, type ProposedAction, type ActionState } from "@/components/chat/action-card";
 import { toast } from "sonner";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type AIProvider = "groq" | "gemini" | "ollama";
 
@@ -56,7 +59,10 @@ interface ChatMessage {
     content: string;
     status: "complete" | "thinking";
     toolCalls?: ToolCall[];
+    action?: ActionState;
 }
+
+// ── Mic hook ──────────────────────────────────────────────────────────────────
 
 function useMicInput(onTranscript: (t: string) => void) {
     const [isListening, setIsListening] = useState(false);
@@ -107,6 +113,8 @@ function useMicInput(onTranscript: (t: string) => void) {
     return { isListening, toggle, supported };
 }
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function AIChatPage() {
     const { data: session } = useSession();
 
@@ -129,10 +137,10 @@ export default function AIChatPage() {
     const chatEndpoint = isStaff ? "/api/ai/staff-chat" : "/api/ai/chat";
     const chatTitle = "Council AI Assistant";
     const chatDescription = isStaff
-        ? "Ask about applications, stats, workload, or anything in the queue."
+        ? "Ask about applications, stats, workload — or take actions like approving, rejecting, or summarising."
         : "Ask about permits, requirements, or your application status.";
     const chatPlaceholder = isStaff
-        ? "e.g. Show me pending applications as a table"
+        ? "e.g. Approve John's building permit, or show me overdue applications"
         : "e.g. What permits do I need to build a fence?";
 
     const agentState: AgentState =
@@ -143,6 +151,8 @@ export default function AIChatPage() {
             : chatStatus === "sending"
             ? "connecting"
             : "listening";
+
+    // ── Send message ───────────────────────────────────────────────────────────
 
     const handleSend = async () => {
         if (!input.trim() || chatStatus !== "idle") return;
@@ -175,13 +185,13 @@ export default function AIChatPage() {
                     messages: history,
                     provider: selectedProvider,
                     includeVisualization: true,
+                    includeActions: true,
                 }),
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
 
             const toolCalls: ToolCall[] = [];
-
             if (data.visualization) {
                 const { type, chart, table, stats } = data.visualization;
                 if (type === "chart" && chart) {
@@ -193,6 +203,10 @@ export default function AIChatPage() {
                 }
             }
 
+            const action: ActionState | undefined = data.action
+                ? { proposal: data.action as ProposedAction, status: "pending" }
+                : undefined;
+
             setMessages((prev) => [
                 ...prev.filter((m) => m.status !== "thinking"),
                 {
@@ -200,6 +214,7 @@ export default function AIChatPage() {
                     content: data.response,
                     status: "complete",
                     toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
+                    action,
                 },
             ]);
             setChatStatus("idle");
@@ -216,10 +231,59 @@ export default function AIChatPage() {
         }
     };
 
+    // ── Action handlers ────────────────────────────────────────────────────────
+
+    const handleActionConfirm = async (messageIndex: number, notes?: string) => {
+        const msg = messages[messageIndex];
+        if (!msg?.action) return;
+
+        // Set loading
+        setMessages((prev) =>
+            prev.map((m, i) =>
+                i === messageIndex
+                    ? { ...m, action: { ...m.action!, status: "loading" } }
+                    : m
+            )
+        );
+
+        try {
+            const result = await executeAction(msg.action.proposal, notes);
+            setMessages((prev) =>
+                prev.map((m, i) =>
+                    i === messageIndex
+                        ? { ...m, action: { ...m.action!, status: "done", result } }
+                        : m
+                )
+            );
+        } catch (err: any) {
+            const errMsg = err?.message ?? "Something went wrong.";
+            setMessages((prev) =>
+                prev.map((m, i) =>
+                    i === messageIndex
+                        ? { ...m, action: { ...m.action!, status: "error", result: errMsg } }
+                        : m
+                )
+            );
+            toast.error("Action failed", { description: errMsg });
+        }
+    };
+
+    const handleActionCancel = (messageIndex: number) => {
+        setMessages((prev) =>
+            prev.map((m, i) =>
+                i === messageIndex && m.action
+                    ? { ...m, action: { ...m.action, status: "cancelled" } }
+                    : m
+            )
+        );
+    };
+
     const handleClearChat = () => {
         setMessages([]);
         toast("Chat cleared");
     };
+
+    // ── Render ─────────────────────────────────────────────────────────────────
 
     return (
         <div className="flex flex-col h-screen bg-background">
@@ -246,7 +310,7 @@ export default function AIChatPage() {
                     </div>
 
                     <div className="flex items-center gap-1">
-                        {/* Provider Selector */}
+                        {/* Provider selector */}
                         <Popover>
                             <PopoverTrigger>
                                 <Button variant="ghost" size="sm" className="h-8 gap-1.5">
@@ -335,6 +399,17 @@ export default function AIChatPage() {
                                             }
                                         >
                                             <EnhancedMessageContent message={m} />
+
+                                            {/* Action card — rendered below AI text */}
+                                            {m.action && (
+                                                <ActionCard
+                                                    action={m.action.proposal}
+                                                    status={m.action.status}
+                                                    result={m.action.result}
+                                                    onConfirm={(notes) => handleActionConfirm(i, notes)}
+                                                    onCancel={() => handleActionCancel(i)}
+                                                />
+                                            )}
                                         </MessageContent>
                                     </Message>
                                 )

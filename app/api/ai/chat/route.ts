@@ -3,6 +3,7 @@ import { prisma } from "@/lib/prisma";
 import { generate, chat } from "@/lib/ai-provider";
 import { getRelevantScenarios } from "@/lib/ai-scenarios";
 import type { Message } from "@/lib/ai-provider";
+import type { ProposedAction } from "@/components/chat/action-card";
 
 // ── Intent classification ─────────────────────────────────────────────────────
 
@@ -172,17 +173,35 @@ async function fetchDocRequirements(messages: Message[]) {
   return { permitTypes, mentionedPermit: mentioned ?? null };
 }
 
+// ── Navigate action classifier ────────────────────────────────────────────────
+
+async function classifyNavigateAction(msg: string): Promise<"start_application" | "view_applications" | null> {
+  const prompt = `Does this message indicate the user wants to navigate somewhere? Reply with ONLY the intent or "none".
+
+Intents:
+start_application  – wants to apply, start a new permit application, how do I apply
+view_applications  – wants to see their applications, check application status, view my submissions
+
+Message: "${msg}"`;
+
+  const raw = (await generate(prompt, 15)).trim().toLowerCase();
+  if (raw === "start_application") return "start_application";
+  if (raw === "view_applications") return "view_applications";
+  return null;
+}
+
 // ── Route ─────────────────────────────────────────────────────────────────────
 
 const SYSTEM_PROMPT =
   `You are a friendly council permit assistant helping members of the public. ` +
   `Be warm, clear, and conversational — like a helpful receptionist who knows permits inside out. ` +
-  `Keep answers concise. If you have data, weave it naturally into your reply.`;
+  `Keep answers concise. If you have data, weave it naturally into your reply. ` +
+  `When a navigation action is identified, briefly acknowledge it and note the card below will take them there.`;
 
 export async function POST(req: NextRequest) {
   try {
     const body = await req.json();
-    const { messages, provider, includeVisualization } = body;
+    const { messages, provider, includeVisualization, includeActions } = body;
 
     if (!messages || !Array.isArray(messages)) {
       return NextResponse.json({ error: "Messages are required" }, { status: 400 });
@@ -191,19 +210,35 @@ export async function POST(req: NextRequest) {
     const lastMessage: string =
       messages.filter((m: any) => m.role === "user").pop()?.content?.trim() || "";
 
-    // 1. Classify intent
-    const intent = await classifyIntent(lastMessage);
+    // 1. Run classifiers in parallel
+    const [intent, vizIntent, navAction] = await Promise.all([
+      classifyIntent(lastMessage),
+      includeVisualization ? classifyVisualization(lastMessage) : Promise.resolve(null),
+      includeActions ? classifyNavigateAction(lastMessage) : Promise.resolve(null),
+    ]);
 
-    // 2. Check for visualization request if enabled
-    let visualizationData: any = null;
-    if (includeVisualization) {
-      const vizIntent = await classifyVisualization(lastMessage);
-      if (vizIntent) {
-        visualizationData = await fetchVisualizationData(vizIntent);
-      }
+    // 2. Fetch visualization data
+    const visualizationData = vizIntent ? await fetchVisualizationData(vizIntent) : null;
+
+    // 3. Build action proposal
+    let actionData: ProposedAction | null = null;
+    if (navAction === "start_application") {
+      actionData = {
+        type: "navigate",
+        label: "Start New Application",
+        description: "Begin a new permit application",
+        href: "/applications/new",
+      };
+    } else if (navAction === "view_applications") {
+      actionData = {
+        type: "navigate",
+        label: "View My Applications",
+        description: "See all your permit applications and their status",
+        href: "/applications",
+      };
     }
 
-    // 3. Fetch relevant data and build enriched system prompt
+    // 4. Fetch relevant data and build enriched system prompt
     let systemWithData = SYSTEM_PROMPT;
 
     if (intent === "permit_recommendation") {
@@ -224,16 +259,21 @@ export async function POST(req: NextRequest) {
       }
     }
 
-    // 4. AI writes the response
+    if (actionData) {
+      systemWithData += `\n\nNavigation action identified: "${actionData.label}". Briefly acknowledge and mention the card below is ready.`;
+    }
+
+    // 5. AI writes the response
     const response = await chat(
       [{ role: "system", content: systemWithData }, ...(messages as Message[])],
       150,
       provider
     );
 
-    return NextResponse.json({ 
+    return NextResponse.json({
       response,
       visualization: visualizationData,
+      action: actionData,
     });
   } catch (error: any) {
     console.error("AI Chat error:", error);
