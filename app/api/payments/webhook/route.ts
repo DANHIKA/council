@@ -2,6 +2,7 @@ import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
 import { createHmac } from "crypto";
 import { createNotification } from "@/lib/notifications";
+import { notifyOfficersNewApplication } from "@/lib/notify-officers";
 
 export async function POST(req: NextRequest) {
     try {
@@ -59,13 +60,35 @@ export async function POST(req: NextRequest) {
         if (isSuccess) {
             const app = await prisma.permitApplication.findUnique({
                 where: { id: payment.application.id },
-                select: { applicantId: true },
+                select: { applicantId: true, status: true },
             });
+
             if (app) {
+                // Auto-submit the application if it hasn't been submitted yet
+                if (app.status === "SUBMITTED") {
+                    await prisma.permitApplication.update({
+                        where: { id: payment.application.id },
+                        data: { status: "UNDER_REVIEW" },
+                    });
+
+                    await prisma.timelineEvent.create({
+                        data: {
+                            applicationId: payment.application.id,
+                            event: "Application Submitted",
+                            description: "Application submitted after payment confirmation.",
+                            status: "UNDER_REVIEW",
+                        },
+                    });
+
+                    // Notify officers now that payment is confirmed and app is ready for review
+                    // (idempotent — skips if callback already notified them)
+                    await notifyOfficersNewApplication(payment.application.id);
+                }
+
                 await createNotification({
                     userId: app.applicantId,
-                    title: "Payment confirmed",
-                    message: `Your application fee of ${payment.currency} ${Number(payment.amount).toLocaleString()} has been received.`,
+                    title: "Payment confirmed & application submitted",
+                    message: `Your application fee of ${payment.currency} ${Number(payment.amount).toLocaleString()} has been received. Your application is now under review.`,
                     type: "PAYMENT",
                     link: `/applications/${payment.application.id}`,
                 });

@@ -21,7 +21,7 @@ export async function POST(req: NextRequest) {
             where: { id: applicationId },
             include: {
                 applicant: { select: { id: true, name: true, email: true } },
-                permitTypeRef: { select: { currency: true, name: true } },
+                permitTypeRef: { select: { currency: true, name: true, applicationFee: true } },
                 payments: true,
             },
         });
@@ -33,7 +33,7 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
-        const fee = 0; // Fee lookup disabled - field not available in schema
+        const fee = Number(application.permitTypeRef?.applicationFee ?? 0);
         const currency = application.permitTypeRef?.currency ?? "MWK";
 
         // If fee is 0 — waive automatically

@@ -42,6 +42,7 @@ export const ROUTE_ACCESS: { pattern: RegExp; roles: UserRole[] | null }[] = [
     { pattern: /^\/applications\/[^/]+\/edit$/,   roles: ["APPLICANT"] },
 
     // Officer + Admin
+    { pattern: /^\/map/,                            roles: ["OFFICER", "ADMIN"] },
     { pattern: /^\/officer\//,                    roles: ["OFFICER", "ADMIN"] },
 
     // Admin only
@@ -51,7 +52,6 @@ export const ROUTE_ACCESS: { pattern: RegExp; roles: UserRole[] | null }[] = [
     { pattern: /^\/chat/,                         roles: null },
     { pattern: /^\/dashboard/,                    roles: null },
     { pattern: /^\/applications/,                 roles: null },
-    { pattern: /^\/map/,                          roles: null },
     { pattern: /^\/profile/,                      roles: null },
 ];
 
@@ -93,7 +93,7 @@ export const NAV_ITEMS = [
         title: "Permit Map",
         href: "/map",
         icon: "Location01Icon" as const,
-        roles: null,
+        roles: ["OFFICER", "ADMIN"] as UserRole[],
     },
     {
         title: "Admin Dashboard",

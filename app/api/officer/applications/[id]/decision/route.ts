@@ -42,7 +42,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             where: { id },
             include: {
                 applicant: { select: { id: true, name: true, email: true } },
-                permitTypeRef: { select: { id: true, name: true, code: true } },
+                permitTypeRef: { select: { id: true, name: true, code: true, applicationFee: true } },
                 certificate: true,
             },
         });
@@ -53,6 +53,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
 
         if (application.officerId && application.officerId !== session.user.id && userRole !== "ADMIN") {
             return NextResponse.json({ error: "Application already assigned to another officer" }, { status: 409 });
+        }
+
+        // Check payment status - officers can't review unpaid applications
+        const fee = Number(application.permitTypeRef?.applicationFee ?? 0);
+        if (fee > 0) {
+            const payments = await prisma.payment.findMany({
+                where: { applicationId: id },
+                select: { status: true },
+            });
+
+            const isPaid = payments.some(p => p.status === "PAID");
+            const isWaived = payments.some(p => p.status === "WAIVED");
+
+            if (!isPaid && !isWaived) {
+                return NextResponse.json(
+                    { error: "Application payment is pending. Cannot proceed with review." },
+                    { status: 400 }
+                );
+            }
         }
 
         // Assign officer if not already assigned

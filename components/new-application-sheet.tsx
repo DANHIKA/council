@@ -113,21 +113,57 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
         setValue("longitude", val.longitude);
     };
 
+    const fee = selectedPermitType ? Number(selectedPermitType.fee ?? 0) : 0;
+    const currency = selectedPermitType?.currency ?? "MWK";
+
     const onSubmit = async (data: ApplicationFormData) => {
         if (!selectedPermitType) return;
         setSubmitting(true);
         setError(null);
         try {
+            // Step 1: Create application
             const { application } = await applicationsApi.create(data);
+
+            // Step 2: Upload all pending documents
             await Promise.all(pendingFiles.map(p => {
                 const fd = new FormData();
                 fd.append("file", p.file);
                 fd.append("requirementId", p.requirementId);
                 return applicationsApi.documents.upload(application.id, fd);
             }));
-            await applicationsApi.submit(application.id);
-            setSuccess(true);
-            onSuccess?.();
+
+            // Step 3: If fee > 0, redirect to payment. Otherwise submit immediately.
+            if (fee > 0) {
+                // Initiate payment - creates Payment record and returns checkout URL
+                const res = await fetch("/api/payments/initiate", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify({ applicationId: application.id }),
+                });
+
+                if (!res.ok) {
+                    const err = await res.json();
+                    throw new Error(err.error || "Payment initiation failed");
+                }
+
+                const paymentData = await res.json();
+
+                if (paymentData.waived) {
+                    // Fee is waived - submit immediately
+                    await applicationsApi.submit(application.id);
+                    setSuccess(true);
+                    onSuccess?.();
+                } else {
+                    // Redirect to Paychangu hosted checkout
+                    // After payment, webhook will confirm and auto-submit the application
+                    window.location.href = paymentData.checkoutUrl;
+                }
+            } else {
+                // No fee - submit immediately
+                await applicationsApi.submit(application.id);
+                setSuccess(true);
+                onSuccess?.();
+            }
         } catch (err: any) {
             setError(err.message || "Submission failed. Please try again.");
         } finally {
@@ -210,47 +246,62 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
                                         />
                                     </div>
 
-                                {selectedPermitType && selectedPermitType.requirements.length > 0 && (
-                                    <div className="space-y-4 animate-in fade-in slide-in-from-bottom-1">
-                                        <Label>Documents</Label>
-                                        {selectedPermitType.requirements.map(req => {
-                                            const pending = getPendingFileForRequirement(req.id);
-                                            return (
-                                                <div key={req.id} className="border rounded-xl p-5 space-y-3">
-                                                    <div className="flex items-start justify-between gap-2">
-                                                        <div className="space-y-1 min-w-0">
-                                                            <div className="flex items-center gap-2 flex-wrap">
-                                                                <span className="text-sm font-medium">{req.label}</span>
-                                                                {req.required && !pending && (
-                                                                    <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-muted-foreground">Required</Badge>
-                                                                )}
-                                                                {pending && (
-                                                                    <Badge className="text-[10px] h-4 px-1.5 bg-green-600 border-none">Ready</Badge>
-                                                                )}
+                                    {selectedPermitType && selectedPermitType.requirements.length > 0 && (
+                                        <div className="space-y-4 animate-in fade-in slide-in-from-bottom-1">
+                                            <Label>Documents</Label>
+                                            {selectedPermitType.requirements.map(req => {
+                                                const pending = getPendingFileForRequirement(req.id);
+                                                return (
+                                                    <div key={req.id} className="border rounded-xl p-5 space-y-3">
+                                                        <div className="flex items-start justify-between gap-2">
+                                                            <div className="space-y-1 min-w-0">
+                                                                <div className="flex items-center gap-2 flex-wrap">
+                                                                    <span className="text-sm font-medium">{req.label}</span>
+                                                                    {req.required && !pending && (
+                                                                        <Badge variant="outline" className="text-[10px] h-4 px-1.5 text-muted-foreground">Required</Badge>
+                                                                    )}
+                                                                    {pending && (
+                                                                        <Badge className="text-[10px] h-4 px-1.5 bg-green-600 border-none">Ready</Badge>
+                                                                    )}
+                                                                </div>
                                                             </div>
                                                         </div>
-                                                    </div>
-                                                    <div className="flex items-center gap-3">
-                                                        {pending ? (
-                                                            <div className="flex items-center gap-2 border rounded-lg p-2 pr-1 bg-background flex-1">
-                                                                <div className="h-8 w-8 bg-green-500/10 rounded-md flex items-center justify-center">
-                                                                    <FileText className="h-4 w-4 text-green-600" />
+                                                        <div className="flex items-center gap-3">
+                                                            {pending ? (
+                                                                <div className="flex items-center gap-2 border rounded-lg p-2 pr-1 bg-background flex-1">
+                                                                    <div className="h-8 w-8 bg-green-500/10 rounded-md flex items-center justify-center">
+                                                                        <FileText className="h-4 w-4 text-green-600" />
+                                                                    </div>
+                                                                    <span className="text-sm font-medium truncate flex-1">{pending.file.name}</span>
+                                                                    <Button type="button" variant="ghost" size="icon-xs" className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                                                        onClick={() => setPendingFiles(p => p.filter(f => f.id !== pending.id))}>
+                                                                        <X className="h-3.5 w-3.5" />
+                                                                    </Button>
                                                                 </div>
-                                                                <span className="text-sm font-medium truncate flex-1">{pending.file.name}</span>
-                                                                <Button type="button" variant="ghost" size="icon-xs" className="h-7 w-7 text-muted-foreground hover:text-destructive"
-                                                                    onClick={() => setPendingFiles(p => p.filter(f => f.id !== pending.id))}>
-                                                                    <X className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                            </div>
-                                                        ) : (
-                                                            <FileUpload onUpload={async (files) => handleFileSelect(files, req.id)} accept={req.acceptMime} />
-                                                        )}
+                                                            ) : (
+                                                                <FileUpload onUpload={async (files) => handleFileSelect(files, req.id)} accept={req.acceptMime} />
+                                                            )}
+                                                        </div>
                                                     </div>
-                                                </div>
-                                            );
-                                        })}
-                                    </div>
-                                )}
+                                                );
+                                            })}
+                                        </div>
+                                    )}
+
+                                    {selectedPermitType && fee > 0 && (
+                                        <div className="rounded-lg border bg-muted/30 p-4 space-y-2">
+                                            <div className="flex items-center justify-between">
+                                                <span className="text-sm font-medium">Application fee</span>
+                                                <span className="text-lg font-bold">
+                                                    {currency} {fee.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                                </span>
+                                            </div>
+                                            <p className="text-xs text-muted-foreground">
+                                                You'll be redirected to complete payment after clicking Submit.
+                                                Your application will be submitted automatically once payment is confirmed.
+                                            </p>
+                                        </div>
+                                    )}
                                 </div>
                             )}
                         </div>
@@ -261,8 +312,8 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
                                     <Button type="button" variant="ghost" onClick={() => onOpenChange(false)} className="text-muted-foreground">
                                         Cancel
                                     </Button>
-                                    <Button 
-                                        type="button" 
+                                    <Button
+                                        type="button"
                                         onClick={handleSubmit(onSubmit)}
                                         disabled={!selectedPermitType || !allRequiredSatisfied || submitting}
                                         className="min-w-[100px]"

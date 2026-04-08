@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
+import { notifyOfficersNewApplication } from "@/lib/notify-officers";
 
 export async function POST(req: NextRequest, { params }: { params: Promise<{ id: string }> }) {
     try {
@@ -54,6 +55,25 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             }, { status: 400 });
         }
 
+        // Check payment status if there's a fee
+        const fee = Number(application.permitTypeRef?.applicationFee ?? 0);
+        if (fee > 0) {
+            const payments = await prisma.payment.findMany({
+                where: { applicationId: id },
+                select: { status: true },
+            });
+
+            const isPaid = payments.some(p => p.status === "PAID");
+            const isWaived = payments.some(p => p.status === "WAIVED");
+
+            if (!isPaid && !isWaived) {
+                return NextResponse.json(
+                    { error: "Payment is required before application can be submitted" },
+                    { status: 402 }
+                );
+            }
+        }
+
         const updated = await prisma.permitApplication.update({
             where: { id },
             data: {
@@ -75,6 +95,9 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 status: "UNDER_REVIEW",
             },
         });
+
+        // Notify officers now that the application is ready for review
+        await notifyOfficersNewApplication(id);
 
         return NextResponse.json({ application: updated });
     } catch (error) {

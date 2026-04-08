@@ -20,7 +20,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from "@/components/ui/select";
-import { Loader2, Users, Shield, FileText, CheckCircle2, XCircle } from "lucide-react";
+import { Loader2, Users, Shield, FileText, CheckCircle2, XCircle, Wallet, CreditCard, TrendingUp } from "lucide-react";
 import { toast } from "sonner";
 import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
 import { adminApi, type AdminUser } from "@/lib/services/admin";
@@ -28,6 +28,9 @@ import { usePermissions } from "@/hooks/usePermissions";
 import { Badge } from "@/components/ui/badge";
 import { useAdminSignoffQueue, useAdminSignoff } from "@/lib/queries";
 import { EmptyState } from "@/components/empty-state";
+import Link from "next/link";
+import { useQuery } from "@tanstack/react-query";
+import { http } from "@/lib/services/http";
 
 export default function AdminPage() {
     const { data: session, status } = useSession();
@@ -40,6 +43,11 @@ export default function AdminPage() {
     const { isAdmin } = usePermissions();
 
     const { data: signoffData, isLoading: signoffLoading } = useAdminSignoffQueue();
+    const { data: txData } = useQuery<any>({
+        queryKey: ["admin", "transactions", "summary"],
+        queryFn: () => http.get("/api/admin/transactions?limit=5"),
+        enabled: isAdmin,
+    });
     const signoffMutation = useAdminSignoff();
 
     const pendingApps = signoffData?.data || [];
@@ -110,7 +118,7 @@ export default function AdminPage() {
             </div>
 
             {/* Stats Cards */}
-            <div className="grid gap-4 md:grid-cols-4">
+            <div className="grid gap-4 md:grid-cols-3 lg:grid-cols-6">
                 <Card>
                     <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
                         <CardTitle className="text-sm font-medium">Total Users</CardTitle>
@@ -145,6 +153,31 @@ export default function AdminPage() {
                     </CardHeader>
                     <CardContent>
                         <div className="text-2xl font-bold">{totalApplicants}</div>
+                    </CardContent>
+                </Card>
+                <Card className="bg-green-50 dark:bg-green-950/20 border-green-200 dark:border-green-900">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Collected</CardTitle>
+                        <TrendingUp className="h-4 w-4 text-green-600" />
+                    </CardHeader>
+                    <CardContent>
+                        <div className="text-lg font-bold text-green-700 dark:text-green-400 truncate">
+                            MWK {Number(txData?.summary?.totalCollected ?? 0).toLocaleString(undefined, { maximumFractionDigits: 0 })}
+                        </div>
+                        <Link href="/admin/transactions" className="text-xs text-muted-foreground hover:underline">View transactions →</Link>
+                    </CardContent>
+                </Card>
+                <Card className="bg-primary/5 border-primary/20">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Withdrawals</CardTitle>
+                        <Wallet className="h-4 w-4 text-primary" />
+                    </CardHeader>
+                    <CardContent>
+                        <Link href="/admin/withdrawals">
+                            <Button variant="outline" size="sm" className="w-full">
+                                Manage
+                            </Button>
+                        </Link>
                     </CardContent>
                 </Card>
             </div>
@@ -268,6 +301,76 @@ export default function AdminPage() {
                                 );
                             })}
                         </div>
+                    )}
+                </CardContent>
+            </Card>
+
+            {/* Recent Transactions widget */}
+            <Card>
+                <CardHeader className="flex flex-row items-center justify-between">
+                    <div>
+                        <CardTitle className="flex items-center gap-2">
+                            <CreditCard className="h-4 w-4" />
+                            Recent Transactions
+                        </CardTitle>
+                        <CardDescription>Latest application fee payments across the portal</CardDescription>
+                    </div>
+                    <Link href="/admin/transactions">
+                        <Button variant="outline" size="sm">View all</Button>
+                    </Link>
+                </CardHeader>
+                <CardContent>
+                    <div className="grid grid-cols-3 gap-3 mb-4">
+                        <div className="rounded-lg bg-green-50 dark:bg-green-950/20 p-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Total Collected</p>
+                            <p className="font-semibold text-sm text-green-700 dark:text-green-400">
+                                MWK {Number(txData?.summary?.totalCollected ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                        <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 p-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Pending</p>
+                            <p className="font-semibold text-sm text-yellow-700 dark:text-yellow-400">
+                                MWK {Number(txData?.summary?.totalPending ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                            </p>
+                        </div>
+                        <div className="rounded-lg bg-muted/40 p-3 text-center">
+                            <p className="text-xs text-muted-foreground mb-1">Paid / Total</p>
+                            <p className="font-semibold text-sm">{txData?.summary?.countPaid ?? 0} / {txData?.summary?.countTotal ?? 0}</p>
+                        </div>
+                    </div>
+                    {txData?.data?.length > 0 ? (
+                        <Table>
+                            <TableHeader>
+                                <TableRow>
+                                    <TableHead>Applicant</TableHead>
+                                    <TableHead>Permit Type</TableHead>
+                                    <TableHead>Amount</TableHead>
+                                    <TableHead>Status</TableHead>
+                                </TableRow>
+                            </TableHeader>
+                            <TableBody>
+                                {txData.data.slice(0, 5).map((tx: any) => (
+                                    <TableRow key={tx.id}>
+                                        <TableCell className="text-sm">{tx.application.applicant.name}</TableCell>
+                                        <TableCell className="text-sm">{tx.application.permitType}</TableCell>
+                                        <TableCell className="text-sm font-medium">
+                                            {tx.currency} {Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </TableCell>
+                                        <TableCell>
+                                            <Badge className={
+                                                tx.status === "PAID" ? "bg-green-100 text-green-800 border-green-200 hover:bg-green-100" :
+                                                tx.status === "PENDING" ? "bg-yellow-100 text-yellow-800 border-yellow-200 hover:bg-yellow-100" :
+                                                "bg-red-100 text-red-800 border-red-200 hover:bg-red-100"
+                                            }>
+                                                {tx.status}
+                                            </Badge>
+                                        </TableCell>
+                                    </TableRow>
+                                ))}
+                            </TableBody>
+                        </Table>
+                    ) : (
+                        <p className="text-sm text-muted-foreground text-center py-4">No transactions yet</p>
                     )}
                 </CardContent>
             </Card>

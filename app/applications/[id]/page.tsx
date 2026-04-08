@@ -62,9 +62,9 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
     useEffect(() => {
         const paymentParam = searchParams.get("payment");
         if (!paymentParam) return;
-        if (paymentParam === "success") toast.success("Payment confirmed! Your application is now being processed.");
+        if (paymentParam === "success") toast.success("Payment confirmed! Your application has been submitted.");
         else if (paymentParam === "failed") toast.error("Payment failed. Please try again.");
-        else if (paymentParam === "cancelled") toast.info("Payment was cancelled.");
+        else if (paymentParam === "cancelled") toast.info("Payment was cancelled. Your application is saved as draft.");
         const url = new URL(window.location.href);
         url.searchParams.delete("payment");
         window.history.replaceState({}, "", url.toString());

@@ -2,6 +2,7 @@
 
 import { useState } from "react";
 import { useSession } from "@/hooks/useSession";
+import { usePermissions } from "@/hooks/usePermissions";
 import { useRouter } from "next/navigation";
 import { Card, CardContent, CardHeader, CardTitle } from "@/components/ui/card";
 import { Badge } from "@/components/ui/badge";
@@ -35,6 +36,7 @@ const STATUS_FILTERS = [
 
 export default function PermitMapPage() {
     const { data: session, status } = useSession();
+    const { isStaff } = usePermissions();
     const router = useRouter();
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
@@ -59,6 +61,11 @@ export default function PermitMapPage() {
     if (status === "loading") return null;
     if (!session) {
         router.push("/auth/login");
+        return null;
+    }
+
+    if (!isStaff) {
+        router.push("/dashboard");
         return null;
     }
 

@@ -1,5 +1,6 @@
 import { NextRequest, NextResponse } from "next/server";
 import { prisma } from "@/lib/prisma";
+import { notifyOfficersNewApplication } from "@/lib/notify-officers";
 
 const PAYCHANGU_VERIFY = "https://api.paychangu.com/verify-payment";
 
@@ -18,7 +19,7 @@ export async function GET(req: NextRequest) {
         // Find our payment record
         const payment = await prisma.payment.findUnique({
             where: { txRef },
-            include: { application: { select: { id: true } } },
+            include: { application: { select: { id: true, status: true } } },
         });
 
         if (!payment) {
@@ -49,6 +50,26 @@ export async function GET(req: NextRequest) {
                     },
                 }),
             ]);
+
+            // Auto-submit if not already under review (webhook might not have fired yet)
+            if (payment.application.status === "SUBMITTED") {
+                await prisma.permitApplication.update({
+                    where: { id: applicationId },
+                    data: { status: "UNDER_REVIEW" },
+                });
+
+                await prisma.timelineEvent.create({
+                    data: {
+                        applicationId,
+                        event: "Application Submitted",
+                        description: "Application submitted after payment confirmation.",
+                        status: "UNDER_REVIEW",
+                    },
+                });
+
+                // Notify officers now that payment is confirmed and app is ready for review
+                await notifyOfficersNewApplication(applicationId);
+            }
 
             return NextResponse.redirect(
                 `${appUrl}/applications/${applicationId}?payment=success`

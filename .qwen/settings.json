@@ -2,7 +2,8 @@
   "permissions": {
     "allow": [
       "Bash(del *)",
-      "Bash(npx *)"
+      "Bash(npx *)",
+      "Bash(mkdir *)"
     ]
   },
   "$version": 3

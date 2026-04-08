@@ -255,10 +255,12 @@ export function NavigationHeader() {
                             <FileText className="h-4 w-4" />
                             {isStaff ? "All Applications" : "My Applications"}
                         </CommandItem>
-                        <CommandItem onSelect={() => cmdNavigate("/map")}>
-                            <Map className="h-4 w-4" />
-                            Permit Map
-                        </CommandItem>
+                        {isStaff && (
+                            <CommandItem onSelect={() => cmdNavigate("/map")}>
+                                <Map className="h-4 w-4" />
+                                Permit Map
+                            </CommandItem>
+                        )}
                     </CommandGroup>
                     {isStaff && (
                         <>

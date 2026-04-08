@@ -6,9 +6,11 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/com
 import { Badge } from "@/components/ui/badge";
 import { Button } from "@/components/ui/button";
 import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
-import { FileText, PlusCircle, Eye, Download, AlertCircle, Bell } from "lucide-react";
+import { FileText, PlusCircle, Eye, Download, AlertCircle, Bell, CreditCard, CheckCircle2, Clock } from "lucide-react";
 import Link from "next/link";
 import { useApplications, useNotifications } from "@/lib/queries";
+import { useQuery } from "@tanstack/react-query";
+import { http } from "@/lib/services/http";
 import { usePermissions } from "@/hooks/usePermissions";
 import { ApplicantOnly, StaffOnly } from "@/components/permission-guard";
 import { EmptyState } from "@/components/empty-state";
@@ -135,6 +137,12 @@ export default function DashboardPage() {
 
     const { data: listData, isLoading, error } = useApplications({ limit: 100 });
     const applications = listData?.data || [];
+
+    const { data: txData } = useQuery<any>({
+        queryKey: ["transactions", "summary"],
+        queryFn: () => http.get("/api/transactions?limit=5"),
+        enabled: !!session,
+    });
 
     const notifications = notificationsData?.notifications?.slice(0, 5) || [];
 
@@ -353,6 +361,70 @@ export default function DashboardPage() {
                     </CardContent>
                 </Card>
 
+                {/* Recent Transactions widget — applicants only */}
+                <ApplicantOnly>
+                    <Card className="lg:col-span-2">
+                        <CardHeader className="flex flex-row items-center justify-between">
+                            <div>
+                                <CardTitle>Recent Transactions</CardTitle>
+                                <CardDescription>Your latest application fee payments</CardDescription>
+                            </div>
+                            <Button variant="outline" size="sm" render={<Link href="/transactions" />}>
+                                View all
+                            </Button>
+                        </CardHeader>
+                        <CardContent>
+                            {/* Summary row */}
+                            <div className="grid grid-cols-3 gap-3 mb-4">
+                                <div className="rounded-lg bg-green-50 dark:bg-green-950/20 p-3 text-center">
+                                    <p className="text-xs text-muted-foreground mb-1">Paid</p>
+                                    <p className="font-semibold text-sm text-green-700 dark:text-green-400">
+                                        MWK {Number(txData?.summary?.totalPaid ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg bg-yellow-50 dark:bg-yellow-950/20 p-3 text-center">
+                                    <p className="text-xs text-muted-foreground mb-1">Pending</p>
+                                    <p className="font-semibold text-sm text-yellow-700 dark:text-yellow-400">
+                                        MWK {Number(txData?.summary?.totalPending ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                <div className="rounded-lg bg-muted/40 p-3 text-center">
+                                    <p className="text-xs text-muted-foreground mb-1">Total</p>
+                                    <p className="font-semibold text-sm">{txData?.summary?.count ?? 0} txns</p>
+                                </div>
+                            </div>
+                            {/* Recent list */}
+                            {txData?.data?.length > 0 ? (
+                                <div className="space-y-2">
+                                    {txData.data.slice(0, 5).map((tx: any) => (
+                                        <div key={tx.id} className="flex items-center justify-between py-2 border-b last:border-0">
+                                            <div className="flex items-center gap-3 min-w-0">
+                                                <div className={`h-7 w-7 rounded-full flex items-center justify-center shrink-0 ${
+                                                    tx.status === "PAID" ? "bg-green-100" :
+                                                    tx.status === "PENDING" ? "bg-yellow-100" : "bg-red-100"
+                                                }`}>
+                                                    {tx.status === "PAID" ? <CheckCircle2 className="h-3.5 w-3.5 text-green-600" /> :
+                                                     tx.status === "PENDING" ? <Clock className="h-3.5 w-3.5 text-yellow-600" /> :
+                                                     <CreditCard className="h-3.5 w-3.5 text-red-500" />}
+                                                </div>
+                                                <div className="min-w-0">
+                                                    <p className="text-sm font-medium truncate">{tx.application.permitType}</p>
+                                                    <p className="text-xs text-muted-foreground">{tx.txRef}</p>
+                                                </div>
+                                            </div>
+                                            <p className="text-sm font-semibold shrink-0 ml-2">
+                                                {tx.currency} {Number(tx.amount).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                            </p>
+                                        </div>
+                                    ))}
+                                </div>
+                            ) : (
+                                <p className="text-sm text-muted-foreground text-center py-4">No transactions yet</p>
+                            )}
+                        </CardContent>
+                    </Card>
+                </ApplicantOnly>
+
                 {/* Quick Actions */}
                 <Card className="lg:col-span-2">
                     <CardHeader>
@@ -369,6 +441,10 @@ export default function DashboardPage() {
                                 <FileText className="h-4 w-4 mr-2" />
                                 View My Applications
                             </Button>
+                            <Button variant="outline" className="w-full justify-start" render={<Link href="/transactions" />}>
+                                <CreditCard className="h-4 w-4 mr-2" />
+                                My Transactions
+                            </Button>
                         </ApplicantOnly>
                         <StaffOnly>
                             <Button className="w-full justify-start" render={<Link href="/officer/applications" />}>
@@ -380,10 +456,12 @@ export default function DashboardPage() {
                                 All Applications
                             </Button>
                         </StaffOnly>
-                        <Button variant="outline" className="w-full justify-start" render={<Link href="/map" />}>
-                            <Download className="h-4 w-4 mr-2" />
-                            Permit Map
-                        </Button>
+                        <StaffOnly>
+                            <Button variant="outline" className="w-full justify-start" render={<Link href="/map" />}>
+                                <Download className="h-4 w-4 mr-2" />
+                                Permit Map
+                            </Button>
+                        </StaffOnly>
                     </CardContent>
                 </Card>
             </div>

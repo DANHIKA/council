@@ -51,6 +51,19 @@ enum PaymentType {
   PERMIT
 }
 
+enum WithdrawalStatus {
+  PENDING
+  PROCESSING
+  COMPLETED
+  FAILED
+  CANCELLED
+}
+
+enum WithdrawalMethodType {
+  BANK_ACCOUNT
+  MOBILE_MONEY
+}
+
 model PermitType {
   id              String             @id @default(cuid())
   code            String             @unique
@@ -109,6 +122,8 @@ model User {
   comments     Comment[]
   notifications Notification[]
   reviewTokens  ReviewToken[]
+  paymentMethods PaymentMethod[]
+  withdrawals  Withdrawal[]
 }
 
 model Account {
@@ -266,4 +281,39 @@ model ReviewToken {
   used          Boolean  @default(false)
   expiresAt     DateTime
   createdAt     DateTime @default(now())
+}
+
+model PaymentMethod {
+  id              String             @id @default(cuid())
+  adminId         String
+  admin           User               @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  type            WithdrawalMethodType
+  details         Json               // Stores bank account or mobile money details
+  isDefault       Boolean            @default(false)
+  isActive        Boolean            @default(true)
+  createdAt       DateTime           @default(now())
+  updatedAt       DateTime           @updatedAt
+
+  withdrawals     Withdrawal[]
+
+  @@index([adminId])
+}
+
+model Withdrawal {
+  id              String            @id @default(cuid())
+  adminId         String
+  admin           User              @relation(fields: [adminId], references: [id], onDelete: Cascade)
+  paymentMethodId String
+  paymentMethod   PaymentMethod     @relation(fields: [paymentMethodId], references: [id])
+  amount          Decimal           @db.Decimal(10, 2)
+  currency        String            @default("MWK")
+  status          WithdrawalStatus  @default(PENDING)
+  reference       String?           // External transaction reference
+  notes           String?           @db.Text
+  processedAt     DateTime?
+  createdAt       DateTime          @default(now())
+  updatedAt       DateTime          @updatedAt
+
+  @@index([adminId])
+  @@index([status])
 }

@@ -37,6 +37,7 @@ export function MobileSidebar() {
     const isApplicant = userRole === "APPLICANT";
     const isOfficer = userRole === "OFFICER";
     const isAdmin = userRole === "ADMIN";
+    const isStaff = isOfficer || isAdmin;
 
     const navItems = [
         {
@@ -67,12 +68,14 @@ export function MobileSidebar() {
                 active: pathname === "/applications" && !pathname.startsWith("/applications/new"),
             },
         ] : []),
-        {
-            title: "Permit Map",
-            href: "/map",
-            icon: Location01Icon,
-            active: pathname === "/map",
-        },
+        ...(isStaff ? [
+            {
+                title: "Permit Map",
+                href: "/map",
+                icon: Location01Icon,
+                active: pathname === "/map",
+            },
+        ] : []),
         ...(isAdmin ? [
             {
                 title: "Admin Dashboard",
