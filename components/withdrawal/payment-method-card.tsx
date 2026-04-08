@@ -216,7 +216,7 @@ export function AddPaymentMethodDialog({ onSuccess }: AddPaymentMethodDialogProp
             setOpen(o);
             if (!o) resetForm();
         }}>
-            <DialogTrigger asChild>
+            <DialogTrigger>
                 <Button>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Payment Method

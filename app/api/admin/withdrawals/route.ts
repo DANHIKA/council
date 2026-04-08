@@ -39,9 +39,10 @@ export async function GET(req: NextRequest) {
         const summary = await prisma.withdrawal.aggregate({
             where: { adminId: session.user.id },
             _sum: { amount: true },
-            _count: {
-                where: { status: "PENDING" },
-            },
+        });
+
+        const pendingCount = await prisma.withdrawal.count({
+            where: { adminId: session.user.id, status: "PENDING" },
         });
 
         const completed = await prisma.withdrawal.count({
@@ -51,8 +52,8 @@ export async function GET(req: NextRequest) {
         return NextResponse.json({
             data: withdrawals,
             summary: {
-                totalWithdrawn: summary._sum.amount?.toNumber() || 0,
-                pendingWithdrawals: summary._count || 0,
+                totalWithdrawn: summary._sum.amount?.toNumber() ?? 0,
+                pendingWithdrawals: pendingCount,
                 completedWithdrawals: completed,
             },
         });

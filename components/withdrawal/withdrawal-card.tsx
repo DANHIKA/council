@@ -153,7 +153,7 @@ export function RequestWithdrawalDialog({ paymentMethods, onSuccess }: RequestWi
             setOpen(o);
             if (!o) resetForm();
         }}>
-            <DialogTrigger asChild>
+            <DialogTrigger>
                 <Button className="w-full">
                     <Plus className="h-4 w-4 mr-2" />
                     Request Withdrawal
@@ -182,7 +182,7 @@ export function RequestWithdrawalDialog({ paymentMethods, onSuccess }: RequestWi
 
                     <div className="space-y-2">
                         <Label>Payment Method</Label>
-                        <Select value={paymentMethodId} onValueChange={setPaymentMethodId}>
+                        <Select value={paymentMethodId} onValueChange={(v) => v && setPaymentMethodId(v)}>
                             <SelectTrigger>
                                 <SelectValue placeholder="Select payment method" />
                             </SelectTrigger>
