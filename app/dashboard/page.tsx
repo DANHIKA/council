@@ -38,6 +38,17 @@ const STATUS_CHART_COLORS: Record<string, string> = {
     REQUIRES_CORRECTION: "hsl(25, 95%, 53%)",
 };
 
+const TYPE_CHART_COLORS = [
+    "hsl(217, 91%, 60%)",  // blue
+    "hsl(142, 71%, 45%)",  // green
+    "hsl(48, 96%, 53%)",   // yellow
+    "hsl(271, 81%, 56%)",  // purple
+    "hsl(0, 84%, 60%)",    // red
+    "hsl(25, 95%, 53%)",   // orange
+    "hsl(180, 65%, 50%)",  // teal
+    "hsl(330, 75%, 55%)",  // pink
+];
+
 const chartConfig = {
     count: { label: "Applications" },
 };
@@ -164,7 +175,7 @@ export default function DashboardPage() {
     const typeChartData = Object.entries(typeCountMap)
         .sort((a, b) => b[1] - a[1])
         .slice(0, 8)
-        .map(([name, count]) => ({ name, count }));
+        .map(([name, count], i) => ({ name, count, fill: TYPE_CHART_COLORS[i % TYPE_CHART_COLORS.length] }));
 
     if (status === "loading") {
         return (
@@ -273,7 +284,11 @@ export default function DashboardPage() {
                                         <XAxis type="number" tick={{ fontSize: 11 }} />
                                         <YAxis type="category" dataKey="name" width={110} tick={{ fontSize: 11 }} />
                                         <Tooltip content={<ChartTooltipContent />} />
-                                        <Bar dataKey="count" fill="hsl(var(--primary))" radius={[0, 4, 4, 0]} />
+                                        <Bar dataKey="count" radius={[0, 4, 4, 0]}>
+                                            {typeChartData.map((entry, i) => (
+                                                <Cell key={i} fill={entry.fill} />
+                                            ))}
+                                        </Bar>
                                     </BarChart>
                                 </ResponsiveContainer>
                             </ChartContainer>

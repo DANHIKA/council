@@ -13,9 +13,9 @@ import {
     UserGroupIcon,
     Location01Icon,
     DashboardCircleIcon,
-    File02Icon,
     Menu01Icon,
     Cancel01Icon,
+    Money03Icon,
 } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/lib/types";
@@ -52,6 +52,12 @@ export function MobileSidebar() {
                 href: "/applications",
                 icon: Note01Icon,
                 active: pathname === "/applications",
+            },
+            {
+                title: "My Transactions",
+                href: "/transactions",
+                icon: Money03Icon,
+                active: pathname === "/transactions",
             },
         ] : []),
         ...(isOfficer || isAdmin ? [
@@ -104,11 +110,17 @@ export function MobileSidebar() {
                         <div className="flex items-center justify-between mb-8">
                             <Link
                                 href="/dashboard"
-                                className="flex items-center space-x-2"
+                                className="flex items-center space-x-3"
                                 onClick={() => setIsOpen(false)}
                             >
-                                <HugeiconsIcon icon={File02Icon} className="h-6 w-6 text-primary" />
-                                <span className="font-bold text-xl tracking-tight">Council Portal</span>
+                                <img
+                                    src="https://lcc.mw/wp-content/uploads/2023/01/PNG-LCC-logo.png"
+                                    alt="LCC Logo"
+                                    className="h-10 w-auto"
+                                />
+                                <div>
+                                    <span className="font-bold text-sm tracking-tight block leading-tight">Lilongwe City Council</span>
+                                </div>
                             </Link>
                             <Button
                                 variant="ghost"

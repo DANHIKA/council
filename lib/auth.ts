@@ -14,11 +14,10 @@ export type ServerSession = {
 export async function auth(): Promise<ServerSession | null> {
     try {
         const supabase = await createSupabaseServerClient();
-        // getSession reads the JWT from the cookie without a network call to Supabase.
-        // This is necessary when the server cannot reach supabase.co (e.g. restricted networks).
-        const { data: { session } } = await supabase.auth.getSession();
-        if (!session?.user) return null;
-        const user = session.user;
+        // getUser() validates the JWT token with the Supabase Auth server,
+        // ensuring the data is authentic and not tampered with.
+        const { data: { user }, error } = await supabase.auth.getUser();
+        if (error || !user) return null;
 
         // Fast path: role + prismaId stored in app_metadata (set during user creation)
         const appMeta = user.app_metadata ?? {};

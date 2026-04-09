@@ -11,8 +11,8 @@ import {
     UserGroupIcon,
     Location01Icon,
     DashboardCircleIcon,
-    File02Icon,
     Chat01Icon,
+    Money03Icon,
 } from "@hugeicons/core-free-icons";
 import { usePermissions } from "@/hooks/usePermissions";
 
@@ -22,8 +22,8 @@ const ICON_MAP = {
     UserGroupIcon,
     Location01Icon,
     DashboardCircleIcon,
-    File02Icon,
     Chat01Icon,
+    Money03Icon,
 } as const;
 
 interface SidebarProps extends React.HTMLAttributes<HTMLDivElement> {}
@@ -42,9 +42,15 @@ export function Sidebar({ className }: SidebarProps) {
     return (
         <div className={cn("pb-12 border-r bg-background w-64 hidden md:flex flex-col", className)}>
             <div className="flex h-16 items-center border-b px-6">
-                <Link href="/dashboard" className="flex items-center space-x-2">
-                    <HugeiconsIcon icon={File02Icon} className="h-6 w-6 text-primary" />
-                    <span className="font-bold text-xl tracking-tight">Council Portal</span>
+                <Link href="/dashboard" className="flex items-center space-x-3">
+                    <img
+                        src="https://lcc.mw/wp-content/uploads/2023/01/PNG-LCC-logo.png"
+                        alt="LCC Logo"
+                        className="h-10 w-auto"
+                    />
+                    <div>
+                        <span className="font-bold text-lg tracking-tight block leading-tight">Lilongwe City Council</span>
+                    </div>
                 </Link>
             </div>
             <div className="flex-1 overflow-y-auto py-4">

@@ -30,9 +30,15 @@ interface GeocodingResult {
     lon: string;
 }
 
-// Malawi center as default — change to suit your region
-const DEFAULT_CENTER: [number, number] = [33.7741, -13.9626];
-const DEFAULT_ZOOM = 6;
+// Lilongwe, Malawi — center and bounds for the location picker
+const LILONGWE_CENTER: [number, number] = [33.7741, -13.9626];
+const DEFAULT_CENTER = LILONGWE_CENTER;
+const DEFAULT_ZOOM = 12;
+// Rough bounding box for Lilongwe (~20km radius around center)
+const LILONGWE_BOUNDS: [[number, number], [number, number]] = [
+    [33.60, -14.10],  // southwest
+    [33.95, -13.80],  // northeast
+];
 
 const CARTO_LIGHT = "https://basemaps.cartocdn.com/gl/positron-gl-style/style.json";
 const CARTO_DARK = "https://basemaps.cartocdn.com/gl/dark-matter-gl-style/style.json";
@@ -76,6 +82,9 @@ export function LocationPicker({ value, onChange, error, disabled }: LocationPic
                 : DEFAULT_CENTER,
             zoom: value.longitude != null && value.latitude != null ? 14 : DEFAULT_ZOOM,
             attributionControl: false,
+            maxBounds: LILONGWE_BOUNDS,
+            minZoom: 11,
+            maxZoom: 18,
         });
 
         map.addControl(new MapLibreGL.NavigationControl({ showCompass: false }), "top-right");
@@ -152,7 +161,7 @@ export function LocationPicker({ value, onChange, error, disabled }: LocationPic
         setSearchResults([]);
         try {
             const res = await fetch(
-                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery)}&format=json&limit=5`
+                `https://nominatim.openstreetmap.org/search?q=${encodeURIComponent(searchQuery + ', Lilongwe, Malawi')}&format=json&limit=5&countrycodes=mw&viewbox=33.60,-13.80,33.95,-14.10&bounded=1`
             );
             const data: GeocodingResult[] = await res.json();
             setSearchResults(data);
@@ -211,7 +220,7 @@ export function LocationPicker({ value, onChange, error, disabled }: LocationPic
         <div className="space-y-1.5">
             {/* Location text input */}
             <Input
-                placeholder="Where will this take place?"
+                placeholder="Where in Lilongwe will this take place?"
                 value={value.location}
                 onChange={(e) => onChange({ ...value, location: e.target.value })}
                 disabled={disabled}
@@ -272,7 +281,7 @@ export function LocationPicker({ value, onChange, error, disabled }: LocationPic
                             <div className="p-2 border-b bg-muted/20">
                                 <div className="flex gap-1.5">
                                     <Input
-                                        placeholder="Search for a place…"
+                                        placeholder="Search in Lilongwe…"
                                         value={searchQuery}
                                         onChange={(e) => setSearchQuery(e.target.value)}
                                         onKeyDown={(e) => e.key === "Enter" && handleSearch()}

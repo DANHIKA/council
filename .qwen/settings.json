@@ -3,7 +3,8 @@
     "allow": [
       "Bash(del *)",
       "Bash(npx *)",
-      "Bash(mkdir *)"
+      "Bash(mkdir *)",
+      "Bash(rmdir *)"
     ]
   },
   "$version": 3

@@ -36,7 +36,7 @@ import {
     UserIcon,
     UserGroupIcon
 } from "@hugeicons/core-free-icons";
-import { LayoutDashboard, FileText, PlusCircle, Map, Users, Search } from "lucide-react";
+import { LayoutDashboard, FileText, PlusCircle, Map, Users, Search, CreditCard } from "lucide-react";
 import { useNotifications } from "@/lib/queries";
 import { usePermissions } from "@/hooks/usePermissions";
 import { useNotificationStream } from "@/hooks/useNotificationStream";
@@ -136,11 +136,22 @@ export function NavigationHeader() {
                 {/* Logo/Brand */}
                 <div className="flex items-center space-x-4">
                     <MobileSidebar />
-                    <Link href="/dashboard" className="flex items-center space-x-2 md:hidden">
-                        <HugeiconsIcon icon={Note01Icon} className="h-6 w-6 text-primary" />
+                    <Link href="/dashboard" className="flex items-center space-x-3 md:hidden">
+                        <img
+                            src="https://lcc.mw/wp-content/uploads/2023/01/PNG-LCC-logo.png"
+                            alt="LCC Logo"
+                            className="h-8 w-auto"
+                        />
                     </Link>
-                    <div className="hidden md:flex items-center space-x-2">
-                        {/* Empty space or breadcrumbs can go here */}
+                    <div className="hidden md:flex items-center space-x-3">
+                        <img
+                            src="https://lcc.mw/wp-content/uploads/2023/01/PNG-LCC-logo.png"
+                            alt="LCC Logo"
+                            className="h-10 w-auto"
+                        />
+                        <div>
+                            <span className="font-bold text-lg tracking-tight block leading-tight">Lilongwe City Council</span>
+                        </div>
                     </div>
                 </div>
 
@@ -246,10 +257,16 @@ export function NavigationHeader() {
                             <CommandShortcut>⌘D</CommandShortcut>
                         </CommandItem>
                         {!isStaff && (
-                            <CommandItem onSelect={() => cmdNavigate("/applications?new=1")}>
-                                <PlusCircle className="h-4 w-4" />
-                                New Application
-                            </CommandItem>
+                            <>
+                                <CommandItem onSelect={() => cmdNavigate("/applications?new=1")}>
+                                    <PlusCircle className="h-4 w-4" />
+                                    New Application
+                                </CommandItem>
+                                <CommandItem onSelect={() => cmdNavigate("/transactions")}>
+                                    <CreditCard className="h-4 w-4" />
+                                    My Transactions
+                                </CommandItem>
+                            </>
                         )}
                         <CommandItem onSelect={() => cmdNavigate("/applications")}>
                             <FileText className="h-4 w-4" />

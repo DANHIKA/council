@@ -28,8 +28,8 @@ export const applicationSchema = z.object({
     permitTypeId: z.string().min(1, "Please select a permit type"),
     description: z.string().min(10, "Description must be at least 10 characters"),
     location: z.string().min(3, "Location is required"),
-    latitude: z.number().optional(),
-    longitude: z.number().optional(),
+    latitude: z.number().refine((v) => v != null && isFinite(v), { message: "Precise location is required" }),
+    longitude: z.number().refine((v) => v != null && isFinite(v), { message: "Precise location is required" }),
 });
 
 type ApplicationFormData = z.infer<typeof applicationSchema>;
@@ -109,8 +109,8 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
 
     const handleLocationChange = (val: LocationValue) => {
         setValue("location", val.location, { shouldValidate: true });
-        setValue("latitude", val.latitude);
-        setValue("longitude", val.longitude);
+        if (val.latitude != null) setValue("latitude", val.latitude as number);
+        if (val.longitude != null) setValue("longitude", val.longitude as number);
     };
 
     const fee = selectedPermitType ? Number(selectedPermitType.fee ?? 0) : 0;
@@ -237,11 +237,11 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
                                     </div>
 
                                     <div className="space-y-2">
-                                        <Label>Location</Label>
+                                        <Label>Location <span className="text-destructive">*</span></Label>
                                         <LocationPicker
                                             value={locationValue}
                                             onChange={handleLocationChange}
-                                            error={errors.location?.message}
+                                            error={errors.location?.message || errors.latitude?.message || errors.longitude?.message}
                                             disabled={submitting}
                                         />
                                     </div>
