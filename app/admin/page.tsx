@@ -180,6 +180,19 @@ export default function AdminPage() {
                         </Link>
                     </CardContent>
                 </Card>
+                <Card className="bg-blue-50 dark:bg-blue-950/20 border-blue-200 dark:border-blue-900">
+                    <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
+                        <CardTitle className="text-sm font-medium">Permit Types</CardTitle>
+                        <FileText className="h-4 w-4 text-blue-600" />
+                    </CardHeader>
+                    <CardContent>
+                        <Link href="/admin/permits">
+                            <Button variant="outline" size="sm" className="w-full">
+                                Manage
+                            </Button>
+                        </Link>
+                    </CardContent>
+                </Card>
             </div>
 
             {/* Pending Sign-off Queue */}
