@@ -133,26 +133,9 @@ export function NavigationHeader() {
         <>
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
             <div className="flex h-16 items-center justify-between px-4 md:px-6">
-                {/* Logo/Brand */}
+                {/* Spacer for alignment */}
                 <div className="flex items-center space-x-4">
                     <MobileSidebar />
-                    <Link href="/dashboard" className="flex items-center space-x-3 md:hidden">
-                        <img
-                            src="https://lcc.mw/wp-content/uploads/2023/01/PNG-LCC-logo.png"
-                            alt="LCC Logo"
-                            className="h-8 w-auto"
-                        />
-                    </Link>
-                    <div className="hidden md:flex items-center space-x-3">
-                        <img
-                            src="https://lcc.mw/wp-content/uploads/2023/01/PNG-LCC-logo.png"
-                            alt="LCC Logo"
-                            className="h-10 w-auto"
-                        />
-                        <div>
-                            <span className="font-bold text-lg tracking-tight block leading-tight">Lilongwe City Council</span>
-                        </div>
-                    </div>
                 </div>
 
                 {/* User Menu */}
