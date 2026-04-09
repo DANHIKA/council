@@ -53,6 +53,7 @@ export const ROUTE_ACCESS: { pattern: RegExp; roles: UserRole[] | null }[] = [
     { pattern: /^\/chat/,                         roles: null },
     { pattern: /^\/dashboard/,                    roles: null },
     { pattern: /^\/applications/,                 roles: null },
+    { pattern: /^\/permits/,                      roles: null },
     { pattern: /^\/profile/,                      roles: null },
 ];
 
@@ -64,6 +65,12 @@ export const NAV_ITEMS = [
         title: "Dashboard",
         href: "/dashboard",
         icon: "Home01Icon" as const,
+        roles: null, // visible to all
+    },
+    {
+        title: "Permits",
+        href: "/permits",
+        icon: "File01Icon" as const,
         roles: null, // visible to all
     },
     {

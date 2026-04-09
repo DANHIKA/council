@@ -135,31 +135,50 @@ export function NewApplicationSheet({ open, onOpenChange, onSuccess, prefilledPe
             // Step 3: If fee > 0, redirect to payment. Otherwise submit immediately.
             if (fee > 0) {
                 // Initiate payment - creates Payment record and returns checkout URL
+                console.log("Initiating payment for application:", application.id);
                 const res = await fetch("/api/payments/initiate", {
                     method: "POST",
                     headers: { "Content-Type": "application/json" },
                     body: JSON.stringify({ applicationId: application.id }),
                 });
 
+                const responseText = await res.text();
+                console.log("Payment API response status:", res.status);
+                console.log("Payment API response:", responseText);
+
                 if (!res.ok) {
-                    const err = await res.json();
-                    throw new Error(err.error || "Payment initiation failed");
+                    let errorMessage = "Payment initiation failed";
+                    try {
+                        const err = JSON.parse(responseText);
+                        errorMessage = err.error || err.message || errorMessage;
+                    } catch {}
+                    throw new Error(errorMessage);
                 }
 
-                const paymentData = await res.json();
+                let paymentData;
+                try {
+                    paymentData = JSON.parse(responseText);
+                } catch (parseError) {
+                    console.error("Failed to parse payment response:", parseError);
+                    throw new Error("Invalid payment response");
+                }
 
                 if (paymentData.waived) {
                     // Fee is waived - submit immediately
+                    console.log("Fee waived, submitting application");
                     await applicationsApi.submit(application.id);
                     setSuccess(true);
                     onSuccess?.();
-                } else {
+                } else if (paymentData.checkoutUrl) {
                     // Redirect to Paychangu hosted checkout
-                    // After payment, webhook will confirm and auto-submit the application
+                    console.log("Redirecting to payment:", paymentData.checkoutUrl);
                     window.location.href = paymentData.checkoutUrl;
+                } else {
+                    throw new Error("No checkout URL received from payment provider");
                 }
             } else {
                 // No fee - submit immediately
+                console.log("No fee, submitting application directly");
                 await applicationsApi.submit(application.id);
                 setSuccess(true);
                 onSuccess?.();

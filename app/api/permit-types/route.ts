@@ -17,7 +17,18 @@ export async function GET(req: NextRequest) {
             }),
         });
 
-        return NextResponse.json({ permitTypes });
+        // Map to match the PermitType interface expected by the frontend
+        const mappedPermitTypes = permitTypes.map(pt => ({
+            id: pt.id,
+            code: pt.code,
+            name: pt.name,
+            description: pt.description,
+            fee: Number(pt.applicationFee), // Use applicationFee as the fee
+            currency: pt.currency,
+            requirements: (pt as any).requirements || [],
+        }));
+
+        return NextResponse.json({ permitTypes: mappedPermitTypes });
     } catch (error) {
         console.error("List permit types error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });

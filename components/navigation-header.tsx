@@ -239,6 +239,10 @@ export function NavigationHeader() {
                             Dashboard
                             <CommandShortcut>⌘D</CommandShortcut>
                         </CommandItem>
+                        <CommandItem onSelect={() => cmdNavigate("/permits")}>
+                            <FileText className="h-4 w-4" />
+                            Permits
+                        </CommandItem>
                         {!isStaff && (
                             <>
                                 <CommandItem onSelect={() => cmdNavigate("/applications?new=1")}>

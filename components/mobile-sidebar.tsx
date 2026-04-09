@@ -16,6 +16,7 @@ import {
     Menu01Icon,
     Cancel01Icon,
     Money03Icon,
+    File01Icon,
 } from "@hugeicons/core-free-icons";
 import { Button } from "@/components/ui/button";
 import type { UserRole } from "@/lib/types";
@@ -45,6 +46,12 @@ export function MobileSidebar() {
             href: "/dashboard",
             icon: Home01Icon,
             active: pathname === "/dashboard",
+        },
+        {
+            title: "Permits",
+            href: "/permits",
+            icon: File01Icon,
+            active: pathname === "/permits",
         },
         ...(isApplicant ? [
             {
