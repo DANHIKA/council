@@ -1,10 +1,18 @@
 import { NextRequest, NextResponse } from "next/server";
+import { z } from "zod";
 import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
-import { unlink } from "fs/promises";
-import { join } from "path";
+import { createNotification } from "@/lib/notifications";
 
-export async function DELETE(req: NextRequest, { params }: { params: Promise<{ id: string; documentId: string }> }) {
+const documentReviewSchema = z.object({
+    status: z.enum(["APPROVED", "REJECTED"]),
+    reviewNotes: z.string().optional(),
+});
+
+export async function PATCH(
+    req: NextRequest,
+    { params }: { params: Promise<{ id: string; documentId: string }> }
+) {
     try {
         const { id, documentId } = await params;
         const session = await auth();
@@ -12,10 +20,25 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
+        const userRole = (session.user as any).role as string;
+        const isStaff = userRole === "OFFICER" || userRole === "ADMIN";
+        if (!isStaff) {
+            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
+        }
+
+        const body = await req.json();
+        const parsed = documentReviewSchema.parse(body);
+
         const document = await prisma.document.findUnique({
             where: { id: documentId },
             include: {
-                application: { select: { id: true, applicantId: true, status: true } },
+                application: {
+                    include: {
+                        applicant: { select: { id: true, name: true, email: true } },
+                        officer: { select: { id: true, name: true, email: true } },
+                        permitTypeRef: { select: { name: true } },
+                    },
+                },
             },
         });
 
@@ -27,32 +50,35 @@ export async function DELETE(req: NextRequest, { params }: { params: Promise<{ i
             return NextResponse.json({ error: "Document does not belong to this application" }, { status: 400 });
         }
 
-        if (document.application.applicantId !== session?.user?.id) {
-            return NextResponse.json({ error: "Forbidden" }, { status: 403 });
-        }
-
-        if (document.application.status !== "SUBMITTED" && document.application.status !== "REQUIRES_CORRECTION") {
-            return NextResponse.json({ error: "Cannot delete documents for this application status" }, { status: 400 });
-        }
-
+        // Already reviewed
         if (document.status !== "PENDING") {
-            return NextResponse.json({ error: "Cannot delete a document that has been reviewed" }, { status: 400 });
+            return NextResponse.json({ error: "Document already reviewed" }, { status: 409 });
         }
 
-        const filepath = join(process.cwd(), "public", document.fileUrl);
-        try {
-            await unlink(filepath);
-        } catch (err) {
-            console.warn("Failed to delete file from disk:", filepath, err);
-        }
-
-        await prisma.document.delete({
+        // Update document
+        const updated = await prisma.document.update({
             where: { id: documentId },
+            data: {
+                status: parsed.status,
+                reviewNotes: parsed.reviewNotes || null,
+            },
         });
 
-        return NextResponse.json({ success: true });
+        // Notify applicant about document review
+        await createNotification({
+            userId: document.application.applicant.id,
+            title: `Document ${parsed.status === "APPROVED" ? "Approved" : "Rejected"}`,
+            message: `Your document "${document.name}" has been ${parsed.status.toLowerCase()}.${parsed.reviewNotes ? ` Notes: ${parsed.reviewNotes}` : ""}`,
+            type: parsed.status === "APPROVED" ? "SUCCESS" : "ERROR",
+            link: `/applications/${id}`,
+        });
+
+        return NextResponse.json({ document: updated });
     } catch (error) {
-        console.error("Delete document error:", error);
+        if (error instanceof z.ZodError) {
+            return NextResponse.json({ error: error.issues }, { status: 400 });
+        }
+        console.error("Document review error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

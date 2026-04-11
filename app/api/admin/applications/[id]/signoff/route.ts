@@ -5,6 +5,7 @@ import { prisma } from "@/lib/prisma";
 import { createNotification } from "@/lib/notifications";
 import { sendEmail } from "@/lib/email";
 import { decisionEmail } from "@/lib/email-templates";
+import { logAudit } from "@/lib/audit";
 
 const signoffSchema = z.object({
     decision: z.enum(["APPROVE", "REJECT"]),
@@ -36,7 +37,7 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             where: { id },
             include: {
                 applicant: { select: { id: true, name: true, email: true } },
-                permitTypeRef: { select: { name: true } },
+                permitTypeRef: { select: { name: true, validityMonths: true } },
                 certificate: true,
             },
         });
@@ -73,13 +74,18 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
         if (parsed.decision === "APPROVE" && !application.certificate) {
             certificateNo = generateCertificateNo(id);
             const issueDate = new Date();
+            const validityMonths = application.permitTypeRef?.validityMonths ?? 12;
             const expiryDate = new Date(issueDate);
-            expiryDate.setFullYear(expiryDate.getFullYear() + 1);
+            expiryDate.setMonth(expiryDate.getMonth() + validityMonths);
+
+            const appUrl = process.env.NEXT_PUBLIC_APP_URL ?? "http://localhost:3000";
+            const verifyUrl = `${appUrl}/api/applications/${id}/certificate/verify?cert=${certificateNo}`;
+
             await prisma.certificate.create({
                 data: {
                     applicationId: id,
                     certificateNo,
-                    qrCode: JSON.stringify({ certificateNo, applicationId: id, issuedAt: issueDate.toISOString() }),
+                    qrCode: verifyUrl,
                     issueDate,
                     expiryDate,
                 },
@@ -88,11 +94,21 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
                 data: {
                     applicationId: id,
                     event: "Certificate Generated",
-                    description: `Certificate ${certificateNo} generated.`,
+                    description: `Certificate ${certificateNo} generated. Valid for ${validityMonths} months.`,
                     status: "APPROVED",
                 },
             });
         }
+
+        // Audit log
+        await logAudit({
+            userId: session.user.id,
+            action: parsed.decision === "APPROVE" ? "APPROVE" : "REJECT",
+            entityType: "APPLICATION",
+            entityId: id,
+            description: `Admin ${parsed.decision === "APPROVE" ? "approved" : "rejected"} ${application.permitTypeRef?.name || application.permitType} application.`,
+            metadata: { decision: parsed.decision, notes: parsed.notes },
+        });
 
         const permitTypeName = application.permitTypeRef?.name || application.permitType;
 

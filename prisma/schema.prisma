@@ -71,6 +71,7 @@ model PermitType {
   description     String?            @db.Text
   applicationFee  Decimal            @default(0) @db.Decimal(10, 2)
   permitFee       Decimal            @default(0) @db.Decimal(10, 2)
+  validityMonths  Int                @default(12)
   currency        String             @default("MWK")
   department      Department         @default(GENERAL)
   createdAt       DateTime           @default(now())
@@ -124,6 +125,8 @@ model User {
   reviewTokens  ReviewToken[]
   paymentMethods PaymentMethod[]
   withdrawals  Withdrawal[]
+  chatSessions  ChatSession[]
+  auditLogs     AuditLog[]
 }
 
 model Account {
@@ -316,4 +319,50 @@ model Withdrawal {
 
   @@index([adminId])
   @@index([status])
+}
+
+model ChatSession {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id], onDelete: Cascade)
+  title         String    // Auto-generated title from first message
+  summary       String?   @db.Text // Compact summary for AI context
+  provider      String    @default("groq")
+  messageCount  Int       @default(0)
+  createdAt     DateTime  @default(now())
+  updatedAt     DateTime  @updatedAt
+
+  messages      ChatMessage[]
+
+  @@index([userId])
+  @@index([updatedAt])
+}
+
+model ChatMessage {
+  id            String    @id @default(cuid())
+  sessionId     String
+  session       ChatSession @relation(fields: [sessionId], references: [id], onDelete: Cascade)
+  role          String    // "user" | "assistant"
+  content       String    @db.Text
+  createdAt     DateTime  @default(now())
+
+  @@index([sessionId])
+  @@index([createdAt])
+}
+
+model AuditLog {
+  id            String    @id @default(cuid())
+  userId        String
+  user          User      @relation(fields: [userId], references: [id])
+  action        String    // "CREATE", "UPDATE", "DELETE", "APPROVE", "REJECT", etc.
+  entityType    String    // "APPLICATION", "USER", "PERMIT_TYPE", "WITHDRAWAL", "CERTIFICATE"
+  entityId      String    // ID of the affected entity
+  description   String?   @db.Text
+  metadata      Json?     // Additional context (before/after values, IP, etc.)
+  createdAt     DateTime  @default(now())
+
+  @@index([userId])
+  @@index([entityType])
+  @@index([entityId])
+  @@index([createdAt])
 }

@@ -95,6 +95,22 @@ export async function POST(req: NextRequest, { params }: { params: Promise<{ id:
             event = "Correction Required";
         }
 
+        // Idempotency: if the same status is being set again with the same notes, skip
+        const existingTimeline = await prisma.timelineEvent.findFirst({
+            where: { applicationId: id, status: nextStatus },
+            orderBy: { createdAt: "desc" },
+        });
+
+        if (existingTimeline && existingTimeline.description === (parsed.notes || undefined)) {
+            return NextResponse.json({ application, idempotent: true });
+        }
+
+        // Guard: don't allow decisions on applications that are already final or pending approval
+        const finalStatuses = ["APPROVED", "REJECTED", "PENDING_APPROVAL"];
+        if (finalStatuses.includes(application.status as string)) {
+            return NextResponse.json({ error: `Application is already ${application.status}` }, { status: 409 });
+        }
+
         const updated = await prisma.permitApplication.update({
             where: { id },
             data: {

@@ -4,9 +4,13 @@ import { useState, useEffect } from "react";
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from "@/components/ui/card";
 import { Button } from "@/components/ui/button";
 import { Badge } from "@/components/ui/badge";
+import { Input } from "@/components/ui/input";
+import { Label } from "@/components/ui/label";
+import { Textarea } from "@/components/ui/textarea";
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from "@/components/ui/select";
 import { permitTypesApi } from "@/lib/services";
 import type { PermitType } from "@/lib/types";
-import { Loader2, Plus, Edit, Trash2, Eye } from "lucide-react";
+import { Loader2, Plus, Edit, Trash2, Eye, X, Save } from "lucide-react";
 import { Alert, AlertDescription, AlertTitle } from "@/components/ui/alert";
 import {
     Table,
@@ -17,6 +21,14 @@ import {
     TableRow,
 } from "@/components/ui/table";
 import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from "@/components/ui/dialog";
+import {
     Sheet,
     SheetContent,
     SheetDescription,
@@ -25,11 +37,26 @@ import {
 } from "@/components/ui/sheet";
 import { toast } from "sonner";
 
+const DEPARTMENTS = ["BUILDING", "BUSINESS", "ENVIRONMENTAL", "ROADS", "EVENTS", "GENERAL"] as const;
+
 export default function AdminPermitsPage() {
     const [permitTypes, setPermitTypes] = useState<PermitType[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedPermit, setSelectedPermit] = useState<PermitType | null>(null);
     const [detailsOpen, setDetailsOpen] = useState(false);
+
+    // Create/Edit dialog
+    const [editOpen, setEditOpen] = useState(false);
+    const [editingPermit, setEditingPermit] = useState<PermitType | null>(null);
+    const [formName, setFormName] = useState("");
+    const [formDesc, setFormDesc] = useState("");
+    const [formAppFee, setFormAppFee] = useState("0");
+    const [formPermitFee, setFormPermitFee] = useState("0");
+    const [formValidityMonths, setFormValidityMonths] = useState("12");
+    const [formCurrency, setFormCurrency] = useState("MWK");
+    const [formDept, setFormDept] = useState("GENERAL");
+    const [saving, setSaving] = useState(false);
+    const [deleting, setDeleting] = useState<string | null>(null);
 
     useEffect(() => {
         loadPermitTypes();
@@ -50,6 +77,93 @@ export default function AdminPermitsPage() {
     const handleViewDetails = (permit: PermitType) => {
         setSelectedPermit(permit);
         setDetailsOpen(true);
+    };
+
+    const openCreate = () => {
+        setEditingPermit(null);
+        setFormName("");
+        setFormDesc("");
+        setFormAppFee("0");
+        setFormPermitFee("0");
+        setFormValidityMonths("12");
+        setFormCurrency("MWK");
+        setFormDept("GENERAL");
+        setEditOpen(true);
+    };
+
+    const openEdit = (permit: PermitType) => {
+        setEditingPermit(permit);
+        setFormName(permit.name);
+        setFormDesc(permit.description || "");
+        setFormAppFee(String(Number(permit.applicationFee ?? permit.fee) || 0));
+        setFormPermitFee(String(Number(permit.permitFee ?? 0)));
+        setFormValidityMonths(String(permit.validityMonths ?? 12));
+        setFormCurrency(permit.currency || "MWK");
+        setFormDept("GENERAL");
+        setDetailsOpen(false);
+        setEditOpen(true);
+    };
+
+    const handleSave = async () => {
+        if (!formName.trim()) {
+            toast.error("Name is required");
+            return;
+        }
+        setSaving(true);
+        try {
+            const payload = {
+                name: formName.trim(),
+                description: formDesc.trim() || undefined,
+                applicationFee: Number(formAppFee) || 0,
+                permitFee: Number(formPermitFee) || 0,
+                validityMonths: Number(formValidityMonths) || 12,
+                currency: formCurrency,
+                department: formDept,
+            };
+
+            if (editingPermit) {
+                await fetch(`/api/admin/permit-types/${editingPermit.id}`, {
+                    method: "PATCH",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                toast.success("Permit type updated");
+            } else {
+                await fetch("/api/admin/permit-types", {
+                    method: "POST",
+                    headers: { "Content-Type": "application/json" },
+                    body: JSON.stringify(payload),
+                });
+                toast.success("Permit type created");
+            }
+
+            setEditOpen(false);
+            loadPermitTypes();
+        } catch {
+            toast.error(editingPermit ? "Failed to update" : "Failed to create");
+        } finally {
+            setSaving(false);
+        }
+    };
+
+    const handleDelete = async (permit: PermitType) => {
+        if (!confirm(`Delete "${permit.name}"? This cannot be undone if it has no applications.`)) return;
+        setDeleting(permit.id);
+        try {
+            const res = await fetch(`/api/admin/permit-types/${permit.id}`, { method: "DELETE" });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed to delete");
+            toast.success("Permit type deleted");
+            loadPermitTypes();
+            if (selectedPermit?.id === permit.id) {
+                setSelectedPermit(null);
+                setDetailsOpen(false);
+            }
+        } catch (err: any) {
+            toast.error(err.message || "Failed to delete");
+        } finally {
+            setDeleting(null);
+        }
     };
 
     if (loading) {
@@ -73,7 +187,7 @@ export default function AdminPermitsPage() {
                         Manage available permit types and their configurations
                     </p>
                 </div>
-                <Button>
+                <Button onClick={openCreate}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Permit Type
                 </Button>
@@ -100,7 +214,8 @@ export default function AdminPermitsPage() {
                                 <TableRow>
                                     <TableHead>Name</TableHead>
                                     <TableHead>Code</TableHead>
-                                    <TableHead>Fee</TableHead>
+                                    <TableHead>Application Fee</TableHead>
+                                    <TableHead>Permit Fee</TableHead>
                                     <TableHead>Requirements</TableHead>
                                     <TableHead className="text-right">Actions</TableHead>
                                 </TableRow>
@@ -123,10 +238,11 @@ export default function AdminPermitsPage() {
                                                 {permit.code}
                                             </code>
                                         </TableCell>
-                                        <TableCell>
-                                            <span className="font-semibold">
-                                                {permit.currency} {Number(permit.fee).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                            </span>
+                                        <TableCell className="font-semibold">
+                                            MWK {Number(permit.applicationFee ?? permit.fee ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                        </TableCell>
+                                        <TableCell className="font-semibold">
+                                            MWK {Number(permit.permitFee ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
                                         </TableCell>
                                         <TableCell>
                                             <Badge variant="secondary">
@@ -134,7 +250,7 @@ export default function AdminPermitsPage() {
                                             </Badge>
                                         </TableCell>
                                         <TableCell className="text-right">
-                                            <div className="flex items-center justify-end gap-2">
+                                            <div className="flex items-center justify-end gap-1">
                                                 <Button
                                                     variant="ghost"
                                                     size="icon"
@@ -142,11 +258,20 @@ export default function AdminPermitsPage() {
                                                 >
                                                     <Eye className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon">
+                                                <Button variant="ghost" size="icon" onClick={() => openEdit(permit)}>
                                                     <Edit className="h-4 w-4" />
                                                 </Button>
-                                                <Button variant="ghost" size="icon">
-                                                    <Trash2 className="h-4 w-4 text-destructive" />
+                                                <Button
+                                                    variant="ghost"
+                                                    size="icon"
+                                                    onClick={() => handleDelete(permit)}
+                                                    disabled={deleting === permit.id}
+                                                >
+                                                    {deleting === permit.id ? (
+                                                        <Loader2 className="h-4 w-4 animate-spin text-destructive" />
+                                                    ) : (
+                                                        <Trash2 className="h-4 w-4 text-destructive" />
+                                                    )}
                                                 </Button>
                                             </div>
                                         </TableCell>
@@ -183,11 +308,25 @@ export default function AdminPermitsPage() {
                                 </div>
                             )}
 
-                            <div className="space-y-2">
-                                <h4 className="text-sm font-medium text-muted-foreground">Application Fee</h4>
-                                <p className="text-2xl font-bold">
-                                    {selectedPermit.currency} {Number(selectedPermit.fee).toLocaleString(undefined, { minimumFractionDigits: 2 })}
-                                </p>
+                            <div className="grid grid-cols-3 gap-4">
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-medium text-muted-foreground">Application Fee</h4>
+                                    <p className="text-xl font-bold">
+                                        MWK {Number(selectedPermit.applicationFee ?? selectedPermit.fee ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-medium text-muted-foreground">Permit Fee</h4>
+                                    <p className="text-xl font-bold">
+                                        MWK {Number(selectedPermit.permitFee ?? 0).toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                                    </p>
+                                </div>
+                                <div className="space-y-2">
+                                    <h4 className="text-sm font-medium text-muted-foreground">Validity</h4>
+                                    <p className="text-xl font-bold">
+                                        {selectedPermit.validityMonths ?? 12} months
+                                    </p>
+                                </div>
                             </div>
 
                             {selectedPermit.requirements && selectedPermit.requirements.length > 0 && (
@@ -217,15 +356,117 @@ export default function AdminPermitsPage() {
                             )}
 
                             <div className="pt-4 border-t flex gap-2">
-                                <Button className="flex-1">
+                                <Button className="flex-1" onClick={() => openEdit(selectedPermit)}>
                                     <Edit className="h-4 w-4 mr-2" />
-                                    Edit Permit Type
+                                    Edit
+                                </Button>
+                                <Button variant="destructive" onClick={() => handleDelete(selectedPermit)}>
+                                    <Trash2 className="h-4 w-4 mr-2" />
+                                    Delete
                                 </Button>
                             </div>
                         </div>
                     )}
                 </SheetContent>
             </Sheet>
+
+            {/* Create/Edit Dialog */}
+            <Dialog open={editOpen} onOpenChange={setEditOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle>{editingPermit ? "Edit" : "Create"} Permit Type</DialogTitle>
+                        <DialogDescription>
+                            {editingPermit ? "Update" : "Add a new"} permit type configuration.
+                        </DialogDescription>
+                    </DialogHeader>
+                    <div className="space-y-4 py-2">
+                        <div className="space-y-2">
+                            <Label htmlFor="pt-name">Name *</Label>
+                            <Input
+                                id="pt-name"
+                                value={formName}
+                                onChange={(e) => setFormName(e.target.value)}
+                                placeholder="e.g. Building Construction"
+                            />
+                        </div>
+                        <div className="space-y-2">
+                            <Label htmlFor="pt-desc">Description</Label>
+                            <Textarea
+                                id="pt-desc"
+                                value={formDesc}
+                                onChange={(e) => setFormDesc(e.target.value)}
+                                placeholder="Brief description of this permit type"
+                                rows={2}
+                            />
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label htmlFor="pt-app-fee">Application Fee (MWK)</Label>
+                                <Input
+                                    id="pt-app-fee"
+                                    type="number"
+                                    min="0"
+                                    value={formAppFee}
+                                    onChange={(e) => setFormAppFee(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="pt-permit-fee">Permit Fee (MWK)</Label>
+                                <Input
+                                    id="pt-permit-fee"
+                                    type="number"
+                                    min="0"
+                                    value={formPermitFee}
+                                    onChange={(e) => setFormPermitFee(e.target.value)}
+                                />
+                            </div>
+                            <div className="space-y-2">
+                                <Label htmlFor="pt-validity">Validity (months)</Label>
+                                <Input
+                                    id="pt-validity"
+                                    type="number"
+                                    min="1"
+                                    max="120"
+                                    value={formValidityMonths}
+                                    onChange={(e) => setFormValidityMonths(e.target.value)}
+                                />
+                            </div>
+                        </div>
+                        <div className="grid grid-cols-2 gap-4">
+                            <div className="space-y-2">
+                                <Label>Currency</Label>
+                                <Select value={formCurrency} onValueChange={(v) => setFormCurrency(v || "MWK")}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="MWK">MWK</SelectItem>
+                                        <SelectItem value="USD">USD</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                            <div className="space-y-2">
+                                <Label>Department</Label>
+                                <Select value={formDept} onValueChange={(v) => setFormDept((v || "GENERAL") as any)}>
+                                    <SelectTrigger><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {DEPARTMENTS.map((d) => (
+                                            <SelectItem key={d} value={d}>{d}</SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <Button variant="outline" onClick={() => setEditOpen(false)} disabled={saving}>
+                            Cancel
+                        </Button>
+                        <Button onClick={handleSave} disabled={saving}>
+                            {saving ? <Loader2 className="h-4 w-4 mr-2 animate-spin" /> : <Save className="h-4 w-4 mr-2" />}
+                            {editingPermit ? "Update" : "Create"}
+                        </Button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 }

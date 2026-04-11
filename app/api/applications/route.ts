@@ -53,7 +53,6 @@ export async function POST(req: NextRequest) {
         if (error instanceof z.ZodError) {
             return NextResponse.json({ error: error.issues }, { status: 400 });
         }
-        console.error("Create application error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }
@@ -61,23 +60,21 @@ export async function POST(req: NextRequest) {
 export async function GET(req: NextRequest) {
     try {
         const session = await auth();
-        console.log("GET /api/applications - session:", {
-            userId: session?.user?.id,
-            email: session?.user?.email,
-            role: (session?.user as any)?.role
-        });
 
         if (!session?.user?.id) {
-            console.log("GET /api/applications - Unauthorized");
             return NextResponse.json({ error: "Unauthorized" }, { status: 401 });
         }
 
         const { searchParams } = new URL(req.url);
-        const page = parseInt(searchParams.get("page") ?? "1", 10);
-        const limit = Math.min(parseInt(searchParams.get("limit") ?? "20", 10), 100);
+        const page = Math.max(1, parseInt(searchParams.get("page") ?? "1", 10) || 1);
+        const limit = Math.min(Math.max(1, parseInt(searchParams.get("limit") ?? "20", 10) || 20), 100);
         const status = searchParams.get("status") ?? undefined;
 
-        console.log("GET /api/applications - query params:", { page, limit, status });
+        // Validate status against enum
+        const validStatuses = ["SUBMITTED", "UNDER_REVIEW", "APPROVED", "REJECTED", "REQUIRES_CORRECTION", "PENDING_APPROVAL"];
+        if (status && !validStatuses.includes(status)) {
+            return NextResponse.json({ error: `Invalid status. Must be one of: ${validStatuses.join(", ")}` }, { status: 400 });
+        }
 
         const where = {
             applicantId: session.user.id,
@@ -103,8 +100,6 @@ export async function GET(req: NextRequest) {
             prisma.permitApplication.count({ where }),
         ]);
 
-        console.log(`GET /api/applications - found ${applications.length} applications (total: ${total})`);
-
         return NextResponse.json({
             data: applications,
             pagination: {
@@ -115,7 +110,6 @@ export async function GET(req: NextRequest) {
             },
         });
     } catch (error) {
-        console.error("List applications error:", error);
         return NextResponse.json({ error: "Internal server error" }, { status: 500 });
     }
 }

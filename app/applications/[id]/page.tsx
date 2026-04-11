@@ -9,11 +9,11 @@ import { Button } from "@/components/ui/button";
 import { Separator } from "@/components/ui/separator";
 import { UploadedFile } from "@/components/file-upload";
 import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
-import { ArrowLeft, Download, FileText, MessageSquare, Plus, Trash2 } from "lucide-react";
+import { ArrowLeft, Download, FileText, MessageSquare, Plus, Trash2, Loader2 } from "lucide-react";
 import Link from "next/link";
 import { useApplication, useApplicationDocuments, useDeleteDocument, useCreateComment, useDownloadCertificate } from "@/lib/queries";
 import { usePermissions } from "@/hooks/usePermissions";
-import { StaffOnly } from "@/components/permission-guard";
+import { AdminOnly, StaffOnly } from "@/components/permission-guard";
 import { EditApplicationSheet } from "@/components/edit-application-sheet";
 import { PaymentCard } from "@/components/payment-card";
 import { toast } from "sonner";
@@ -35,6 +35,7 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
     const deleteDocumentMutation = useDeleteDocument(resolvedParams?.id || "");
     const createCommentMutation = useCreateComment(resolvedParams?.id || "");
     const downloadCertificateMutation = useDownloadCertificate();
+    const [renewing, setRenewing] = useState(false);
 
     useEffect(() => {
         if (status === "loading") return;
@@ -134,6 +135,25 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
             document.body.removeChild(a);
         } catch (err: any) {
             toast.error(err.message || "Failed to download certificate");
+        }
+    };
+
+    const handleRenewCertificate = async () => {
+        setRenewing(true);
+        try {
+            const res = await fetch("/api/admin/certificates/renew", {
+                method: "POST",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ applicationId: application.id }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed");
+            toast.success("Certificate renewed successfully");
+            router.refresh();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to renew certificate");
+        } finally {
+            setRenewing(false);
         }
     };
 
@@ -295,6 +315,17 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
                                     <Download className="h-4 w-4 mr-2" />
                                     {downloadCertificateMutation.isPending ? "Downloading..." : "Download Certificate"}
                                 </Button>
+                                <AdminOnly>
+                                    <Button
+                                        variant="outline"
+                                        className="w-full border-primary/20 hover:border-primary"
+                                        onClick={handleRenewCertificate}
+                                        disabled={renewing}
+                                    >
+                                        <Loader2 className={`h-4 w-4 mr-2 ${renewing ? "animate-spin" : ""}`} />
+                                        {renewing ? "Renewing..." : "Renew Certificate"}
+                                    </Button>
+                                </AdminOnly>
                             </CardContent>
                         </Card>
                     )}

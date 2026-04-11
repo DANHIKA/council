@@ -115,6 +115,12 @@ export const NAV_ITEMS = [
         icon: "DashboardCircleIcon" as const,
         roles: ["ADMIN"] as UserRole[],
     },
+    {
+        title: "Audit Log",
+        href: "/admin/audit",
+        icon: "ClipboardListIcon" as const,
+        roles: ["ADMIN"] as UserRole[],
+    },
 ] satisfies {
     title: string;
     href: string;

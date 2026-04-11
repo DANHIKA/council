@@ -9,9 +9,10 @@ import { Button } from "@/components/ui/button";
 import { Textarea } from "@/components/ui/textarea";
 import { Label } from "@/components/ui/label";
 import { Separator } from "@/components/ui/separator";
+import { Input } from "@/components/ui/input";
 import { UploadedFile } from "@/components/file-upload";
 import { formatDateTime, getStatusColor, getStatusLabel } from "@/lib/utils";
-import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Sparkles, Loader2, Clock, User } from "lucide-react";
+import { ArrowLeft, CheckCircle2, XCircle, AlertCircle, Sparkles, Loader2, Clock, User, Check, X } from "lucide-react";
 import Link from "next/link";
 import {
     useOfficerApplication,
@@ -43,6 +44,10 @@ export default function OfficerReviewPage() {
     const [showHistory, setShowHistory] = useState(false);
     const [isSummarizing, setIsSummarizing] = useState(false);
     const [aiSummary, setAiSummary] = useState<string | null>(null);
+
+    // Document review state
+    const [reviewingDocId, setReviewingDocId] = useState<string | null>(null);
+    const [docReviewNotes, setDocReviewNotes] = useState("");
 
     const { isStaff, isAdmin } = usePermissions();
 
@@ -140,6 +145,25 @@ export default function OfficerReviewPage() {
             toast.error(err.message || "Failed to submit decision");
         } finally {
             setIsSubmitting(false);
+        }
+    };
+
+    const handleDocReview = async (docId: string, status: "APPROVED" | "REJECTED") => {
+        try {
+            const res = await fetch(`/api/applications/${application.id}/documents/${docId}`, {
+                method: "PATCH",
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify({ status, reviewNotes: docReviewNotes || undefined }),
+            });
+            const data = await res.json();
+            if (!res.ok) throw new Error(data.error || "Failed");
+            toast.success(`Document ${status.toLowerCase()}`);
+            setReviewingDocId(null);
+            setDocReviewNotes("");
+            // Refresh application data
+            router.refresh();
+        } catch (err: any) {
+            toast.error(err.message || "Failed to review document");
         }
     };
 
@@ -248,7 +272,66 @@ export default function OfficerReviewPage() {
                             ) : (
                                 <div className="space-y-3">
                                     {application.documents.map((doc: any) => (
-                                        <UploadedFile key={doc.id} file={doc} showStatus />
+                                        <div key={doc.id}>
+                                            <UploadedFile file={doc} showStatus />
+                                            {/* Review controls for pending documents */}
+                                            {doc.status === "PENDING" && reviewingDocId !== doc.id && (
+                                                <div className="flex items-center gap-2 mt-2 ml-1">
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-7 text-xs gap-1 text-green-700 border-green-200 hover:bg-green-50"
+                                                        onClick={() => setReviewingDocId(doc.id)}
+                                                    >
+                                                        <Check className="h-3 w-3" /> Approve
+                                                    </Button>
+                                                    <Button
+                                                        size="sm"
+                                                        variant="outline"
+                                                        className="h-7 text-xs gap-1 text-red-700 border-red-200 hover:bg-red-50"
+                                                        onClick={() => setReviewingDocId(doc.id)}
+                                                    >
+                                                        <X className="h-3 w-3" /> Reject
+                                                    </Button>
+                                                </div>
+                                            )}
+                                            {/* Inline review form */}
+                                            {reviewingDocId === doc.id && (
+                                                <div className="mt-2 p-3 border rounded-lg bg-muted/30 space-y-2">
+                                                    <Input
+                                                        placeholder="Review notes (optional)"
+                                                        value={docReviewNotes}
+                                                        onChange={(e) => setDocReviewNotes(e.target.value)}
+                                                        className="h-8 text-xs"
+                                                    />
+                                                    <div className="flex items-center gap-2">
+                                                        <Button
+                                                            size="sm"
+                                                            className="h-7 text-xs gap-1 bg-green-600 hover:bg-green-700"
+                                                            onClick={() => handleDocReview(doc.id, "APPROVED")}
+                                                        >
+                                                            <Check className="h-3 w-3" /> Approve
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="destructive"
+                                                            className="h-7 text-xs gap-1"
+                                                            onClick={() => handleDocReview(doc.id, "REJECTED")}
+                                                        >
+                                                            <X className="h-3 w-3" /> Reject
+                                                        </Button>
+                                                        <Button
+                                                            size="sm"
+                                                            variant="ghost"
+                                                            className="h-7 text-xs"
+                                                            onClick={() => { setReviewingDocId(null); setDocReviewNotes(""); }}
+                                                        >
+                                                            Cancel
+                                                        </Button>
+                                                    </div>
+                                                </div>
+                                            )}
+                                        </div>
                                     ))}
                                 </div>
                             )}

@@ -33,6 +33,11 @@ export async function POST(req: NextRequest) {
             return NextResponse.json({ error: "Forbidden" }, { status: 403 });
         }
 
+        // Block payment if application is already approved or rejected
+        if (["APPROVED", "REJECTED"].includes(application.status)) {
+            return NextResponse.json({ error: `Cannot pay for an application that is already ${application.status.toLowerCase()}` }, { status: 409 });
+        }
+
         const fee = Number(application.permitTypeRef?.applicationFee ?? 0);
         const currency = application.permitTypeRef?.currency ?? "MWK";
 
@@ -86,14 +91,16 @@ export async function POST(req: NextRequest) {
 
         const data = await response.json();
 
-        if (!response.ok || !data.checkout_url) {
+        const checkoutUrl = data?.data?.checkout_url ?? data?.checkout_url;
+
+        if (!response.ok || !checkoutUrl) {
             console.error("Paychangu error:", data);
             return NextResponse.json({ error: data.message ?? "Payment initiation failed" }, { status: 502 });
         }
 
         return NextResponse.json({
-            checkoutUrl: data.checkout_url,
-            txRef: data.tx_ref ?? txRef,
+            checkoutUrl,
+            txRef: data?.data?.tx_ref ?? data?.tx_ref ?? txRef,
             amount: fee,
             currency,
         });

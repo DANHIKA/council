@@ -115,6 +115,9 @@ export interface PermitType {
     name: string;
     description?: string;
     fee: number;
+    applicationFee?: number;
+    permitFee?: number;
+    validityMonths?: number;
     currency: string;
     requirements: PermitRequirement[];
 }
