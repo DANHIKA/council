@@ -2,10 +2,6 @@
 
 import { useState } from "react";
 import { useRouter } from "next/navigation";
-import { Button } from "@/components/ui/button";
-import { Textarea } from "@/components/ui/textarea";
-import { Card, CardContent } from "@/components/ui/card";
-import { Badge } from "@/components/ui/badge";
 import {
     CheckCircle2,
     XCircle,
@@ -18,6 +14,7 @@ import {
     Loader2,
     CheckCheck,
 } from "lucide-react";
+import { cn } from "@/lib/utils";
 
 // ── Types ─────────────────────────────────────────────────────────────────────
 
@@ -189,111 +186,76 @@ export function ActionCard({
     // Done
     if (status === "done") {
         return (
-            <Card className="mt-3 border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20">
-                <CardContent className="pt-3 pb-3 px-4">
-                    <div className="flex items-start gap-2">
-                        <CheckCheck className="h-4 w-4 text-green-600 mt-0.5 shrink-0" />
-                        <div>
-                            <p className="text-sm font-medium text-green-700 dark:text-green-400">
-                                {action.label} — Done
-                            </p>
-                            {result && (
-                                <p className="text-xs text-muted-foreground mt-1 whitespace-pre-wrap leading-relaxed">
-                                    {result}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="mt-2 flex items-start gap-2 rounded-lg border border-green-200 bg-green-50 dark:border-green-900 dark:bg-green-950/20 px-3 py-2">
+                <CheckCheck className="h-3.5 w-3.5 text-green-600 mt-0.5 shrink-0" />
+                <div>
+                    <p className="text-xs font-medium text-green-700 dark:text-green-400">{action.label} — Done</p>
+                    {result && <p className="text-[11px] text-muted-foreground mt-0.5">{result}</p>}
+                </div>
+            </div>
         );
     }
 
     // Error
     if (status === "error") {
         return (
-            <Card className="mt-3 border-destructive/30 bg-destructive/5">
-                <CardContent className="pt-3 pb-3 px-4">
-                    <div className="flex items-start gap-2">
-                        <XCircle className="h-4 w-4 text-destructive mt-0.5 shrink-0" />
-                        <div>
-                            <p className="text-sm font-medium text-destructive">Action failed</p>
-                            {result && (
-                                <p className="text-xs text-muted-foreground mt-1">{result}</p>
-                            )}
-                        </div>
-                    </div>
-                </CardContent>
-            </Card>
+            <div className="mt-2 flex items-start gap-2 rounded-lg border border-destructive/30 bg-destructive/5 px-3 py-2">
+                <XCircle className="h-3.5 w-3.5 text-destructive mt-0.5 shrink-0" />
+                <div>
+                    <p className="text-xs font-medium text-destructive">Action failed</p>
+                    {result && <p className="text-[11px] text-muted-foreground mt-0.5">{result}</p>}
+                </div>
+            </div>
         );
     }
 
     // Pending / Loading
     return (
-        <Card className="mt-3 border-border bg-muted/30">
-            <CardContent className="pt-4 pb-4 px-4 space-y-3">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-2">
-                        <span className={meta.color}>{meta.icon}</span>
-                        <span className="text-sm font-semibold">{action.label}</span>
-                    </div>
-                    <Badge variant={meta.badgeVariant} className="text-[10px] font-medium">
-                        Awaiting confirmation
-                    </Badge>
+        <div className="mt-2 rounded-lg border bg-muted/20 overflow-hidden">
+            <div className="flex items-center gap-2 px-3 py-2">
+                <span className={cn("shrink-0", meta.color)}>{meta.icon}</span>
+                <div className="flex-1 min-w-0">
+                    <p className="text-xs font-medium leading-tight">{action.label}</p>
+                    <p className="text-[11px] text-muted-foreground truncate">{action.description}</p>
                 </div>
+                {status === "loading" ? (
+                    <Loader2 className="h-3.5 w-3.5 animate-spin text-muted-foreground shrink-0" />
+                ) : (
+                    <div className="flex items-center gap-1 shrink-0">
+                        <button
+                            onClick={onCancel}
+                            className="text-[11px] text-muted-foreground hover:text-foreground px-2 py-1 rounded transition-colors"
+                        >
+                            Dismiss
+                        </button>
+                        <button
+                            onClick={handleConfirm}
+                            disabled={internalLoading}
+                            className={cn(
+                                "text-[11px] font-medium px-2.5 py-1 rounded transition-colors",
+                                meta.badgeVariant === "destructive"
+                                    ? "bg-destructive text-destructive-foreground hover:bg-destructive/90"
+                                    : "bg-primary text-primary-foreground hover:bg-primary/90"
+                            )}
+                        >
+                            {meta.confirmLabel}
+                        </button>
+                    </div>
+                )}
+            </div>
 
-                {/* Description */}
-                <p className="text-xs text-muted-foreground leading-relaxed">
-                    {action.description}
-                </p>
-
-                {/* Notes input */}
-                {action.requiresNotes && status === "pending" && (
-                    <Textarea
+            {action.requiresNotes && status === "pending" && (
+                <div className="border-t px-3 pb-2 pt-1.5">
+                    <textarea
                         placeholder="Add notes (optional)..."
                         value={notes}
                         onChange={(e) => setNotes(e.target.value)}
                         rows={2}
-                        className="text-xs resize-none"
+                        className="w-full text-xs bg-transparent resize-none outline-none placeholder:text-muted-foreground"
                     />
-                )}
-
-                {/* Buttons */}
-                <div className="flex gap-2 justify-end">
-                    {status === "loading" ? (
-                        <Button size="sm" className="h-7 text-xs" disabled>
-                            <Loader2 className="h-3 w-3 mr-1 animate-spin" />
-                            Processing...
-                        </Button>
-                    ) : (
-                        <>
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={onCancel}
-                            >
-                                Cancel
-                            </Button>
-                            <Button
-                                size="sm"
-                                className="h-7 text-xs"
-                                onClick={handleConfirm}
-                                disabled={internalLoading}
-                            >
-                                {action.type === "navigate" ? (
-                                    <ArrowRight className="h-3 w-3 mr-1" />
-                                ) : (
-                                    <CheckCircle2 className="h-3 w-3 mr-1" />
-                                )}
-                                {meta.confirmLabel}
-                            </Button>
-                        </>
-                    )}
                 </div>
-            </CardContent>
-        </Card>
+            )}
+        </div>
     );
 }
 

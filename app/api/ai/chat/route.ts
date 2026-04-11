@@ -1,4 +1,5 @@
 import { NextRequest, NextResponse } from "next/server";
+import { auth } from "@/lib/auth";
 import { prisma } from "@/lib/prisma";
 import { generate, chat } from "@/lib/ai-provider";
 import { getRelevantScenarios } from "@/lib/ai-scenarios";
@@ -7,7 +8,7 @@ import type { ProposedAction } from "@/components/chat/action-card";
 
 // ── Intent classification ─────────────────────────────────────────────────────
 
-const INTENTS = ["greeting", "permit_recommendation", "document_requirements", "conversation"] as const;
+const INTENTS = ["greeting", "permit_recommendation", "document_requirements", "my_applications", "conversation"] as const;
 type Intent = typeof INTENTS[number];
 
 const VISUALIZATION_INTENTS = [
@@ -21,12 +22,13 @@ async function classifyIntent(msg: string): Promise<Intent> {
 Intents:
 greeting              – hello, hi, how are you, social pleasantries
 permit_recommendation – what permit do I need, I want to build/open/start X, which permit for Y
-document_requirements – what documents do I need, what should I bring, checklist, requirements
+document_requirements – what documents do I need, what should I bring, checklist, requirements for a permit
+my_applications       – my applications, my submissions, my permits, check my status, what is the status of my application, have I applied
 conversation          – anything else
 
 Message: "${msg}"`;
 
-  const raw = (await generate(prompt, 10)).trim().toLowerCase();
+  const raw = (await generate(prompt, 15)).trim().toLowerCase();
   return (INTENTS as readonly string[]).includes(raw) ? (raw as Intent) : "conversation";
 }
 
@@ -47,7 +49,7 @@ Message: "${msg}"`;
 
 // ── Data fetchers ─────────────────────────────────────────────────────────────
 
-async function fetchVisualizationData(intent: VisualizationIntent): Promise<any> {
+async function fetchVisualizationData(intent: VisualizationIntent, messages: Message[] = []): Promise<any> {
   switch (intent) {
     case "chart_permit_types": {
       const permitTypes = await prisma.permitType.findMany({
@@ -104,7 +106,15 @@ async function fetchVisualizationData(intent: VisualizationIntent): Promise<any>
         include: { requirements: { select: { label: true, required: true } } },
         orderBy: { name: "asc" },
       });
-      const data = permitTypes.flatMap((p) =>
+
+      // Filter to the specific permit mentioned in conversation, if any
+      const allText = messages.map(m => m.content).join(" ").toLowerCase();
+      const matchedPermit = permitTypes
+        .filter(p => allText.includes(p.name.toLowerCase()))
+        .sort((a, b) => b.name.length - a.name.length)[0];
+
+      const filtered = matchedPermit ? [matchedPermit] : permitTypes;
+      const data = filtered.flatMap((p) =>
         p.requirements.map((r) => ({
           permitType: p.name,
           requirement: r.label,
@@ -114,9 +124,9 @@ async function fetchVisualizationData(intent: VisualizationIntent): Promise<any>
       return {
         type: "table",
         table: {
-          title: "Permit Requirements",
+          title: matchedPermit ? `${matchedPermit.name} Requirements` : "Permit Requirements",
           columns: [
-            { key: "permitType", header: "Permit Type" },
+            ...(matchedPermit ? [] : [{ key: "permitType", header: "Permit Type" }]),
             { key: "requirement", header: "Requirement" },
             { key: "type", header: "Type", type: "badge" as const },
           ],
@@ -162,15 +172,18 @@ async function fetchDocRequirements(messages: Message[]) {
     include: { requirements: { select: { label: true, required: true } } },
   });
 
-  // Find the most recently mentioned permit in the conversation
+  // Search all messages (user + assistant) for a permit name match
   const allText = messages
-    .filter(m => m.role === "assistant")
     .map(m => m.content)
     .join(" ")
     .toLowerCase();
 
-  const mentioned = permitTypes.find(p => allText.includes(p.name.toLowerCase()));
-  return { permitTypes, mentionedPermit: mentioned ?? null };
+  // Prefer the most specific (longest) match to avoid false positives
+  const mentioned = permitTypes
+    .filter(p => allText.includes(p.name.toLowerCase()))
+    .sort((a, b) => b.name.length - a.name.length)[0] ?? null;
+
+  return { permitTypes, mentionedPermit: mentioned };
 }
 
 // ── Navigate action classifier ────────────────────────────────────────────────
@@ -200,6 +213,11 @@ const SYSTEM_PROMPT =
 
 export async function POST(req: NextRequest) {
   try {
+    // Optional auth — tailor responses if user is logged in
+    const session = await auth();
+    const userId = session?.user?.id ?? null;
+    const userName = (session?.user as any)?.name ?? session?.user?.email?.split("@")[0] ?? null;
+
     const body = await req.json();
     const { messages, provider, includeVisualization, includeActions } = body;
 
@@ -218,7 +236,7 @@ export async function POST(req: NextRequest) {
     ]);
 
     // 2. Fetch visualization data
-    const visualizationData = vizIntent ? await fetchVisualizationData(vizIntent) : null;
+    const visualizationData = vizIntent ? await fetchVisualizationData(vizIntent, messages as Message[]) : null;
 
     // 3. Build action proposal
     let actionData: ProposedAction | null = null;
@@ -239,7 +257,9 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Fetch relevant data and build enriched system prompt
-    let systemWithData = SYSTEM_PROMPT;
+    let systemWithData = userName
+      ? `${SYSTEM_PROMPT}\n\nYou are speaking with ${userName}.`
+      : SYSTEM_PROMPT;
 
     if (intent === "permit_recommendation") {
       const { permitTypes, scenarios } = await fetchPermitData(lastMessage);
@@ -252,10 +272,43 @@ export async function POST(req: NextRequest) {
       if (mentionedPermit) {
         const required = mentionedPermit.requirements.filter(r => r.required).map(r => r.label);
         const optional = mentionedPermit.requirements.filter(r => !r.required).map(r => r.label);
-        systemWithData += `\n\nPermit: ${mentionedPermit.name}\nRequired documents: ${required.join(", ") || "none listed"}\nOptional documents: ${optional.join(", ") || "none"}\n\nExplain these requirements naturally and helpfully.`;
+        systemWithData +=
+          `\n\nPermit: ${mentionedPermit.name}` +
+          `\nRequired documents: ${required.join(", ") || "none listed"}` +
+          `\nOptional documents: ${optional.join(", ") || "none"}` +
+          `\n\nIMPORTANT: List ONLY the documents above — do not add, invent, or suggest any documents not in this list. Present them clearly and offer to help with the application.`;
       } else {
         const permitList = permitTypes.map(p => p.name).join(", ");
-        systemWithData += `\n\nAvailable permit types: ${permitList}\n\nAsk which permit they're applying for so you can give them the exact document list.`;
+        systemWithData += `\n\nAvailable permit types: ${permitList}\n\nAsk which permit they're applying for so you can give them the exact document list. Do not guess or list requirements without knowing the specific permit.`;
+      }
+    }
+
+    if (intent === "my_applications") {
+      if (userId) {
+        const myApps = await prisma.permitApplication.findMany({
+          where: { applicantId: userId },
+          select: {
+            permitType: true,
+            status: true,
+            createdAt: true,
+            updatedAt: true,
+          },
+          orderBy: { createdAt: "desc" },
+          take: 10,
+        });
+
+        if (myApps.length === 0) {
+          systemWithData += `\n\nThis user has no applications yet. Encourage them to start one and offer to help them figure out which permit they need.`;
+        } else {
+          const appList = myApps
+            .map(a => `- ${a.permitType}: ${a.status.replace(/_/g, " ")} (submitted ${new Date(a.createdAt).toLocaleDateString()})`)
+            .join("\n");
+          systemWithData +=
+            `\n\nUser's applications:\n${appList}` +
+            `\n\nSummarise their application statuses clearly and helpfully. If any are pending or need correction, highlight that.`;
+        }
+      } else {
+        systemWithData += `\n\nThe user asked about their applications but is not logged in. Tell them they need to log in to check their application status, and offer to answer general questions in the meantime.`;
       }
     }
 
