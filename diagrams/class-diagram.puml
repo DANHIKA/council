@@ -12,6 +12,8 @@ skinparam defaultFontName Segoe UI
 skinparam defaultFontSize 10
 skinparam defaultFontColor #111827
 skinparam shadowing false
+skinparam linetype ortho
+top to bottom direction
 skinparam noteBackgroundColor #FFFBEB
 skinparam noteBorderColor #F59E0B
 skinparam noteFontColor #111827

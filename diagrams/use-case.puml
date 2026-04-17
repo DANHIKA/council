@@ -1,11 +1,10 @@
 @startuml use-case
 !theme vibrant
-left to right direction
-
 skinparam defaultFontName Segoe UI
 skinparam defaultFontSize 11
 skinparam defaultFontColor #111827
 skinparam shadowing false
+skinparam linetype ortho
 skinparam actorBackgroundColor #DBEAFE
 skinparam actorBorderColor #1D4ED8
 skinparam usecaseBackgroundColor #EEF2FF
@@ -23,8 +22,11 @@ title Council Permit Portal — Use Case Diagram
 
 actor "Applicant"       as AP #DBEAFE
 actor "Officer"         as OF #E0E7FF
+actor "Admin"           as AD #EDE9FE
+actor "AI System"       as AI #FEF3C7
+actor "Payment System"  as PAY #D1FAE5
 
-rectangle "Council Permit Portal" {
+package "Council Permit Portal" {
   usecase "Browse Permit Catalogue"   as UC1
   usecase "Start Application"         as UC2
   usecase "Upload Documents"          as UC3
@@ -47,32 +49,29 @@ rectangle "Council Permit Portal" {
   usecase "Manage Withdrawals"        as UC20
   usecase "Renew Certificate"         as UC21
 
-  ' Force a single vertical column
-  UC1  -[hidden]down-> UC2
-  UC2  -[hidden]down-> UC3
-  UC3  -[hidden]down-> UC4
-  UC4  -[hidden]down-> UC5
-  UC5  -[hidden]down-> UC6
-  UC6  -[hidden]down-> UC7
-  UC7  -[hidden]down-> UC8
-  UC8  -[hidden]down-> UC9
-  UC9  -[hidden]down-> UC10
-  UC10 -[hidden]down-> UC11
-  UC11 -[hidden]down-> UC12
-  UC12 -[hidden]down-> UC13
-  UC13 -[hidden]down-> UC14
-  UC14 -[hidden]down-> UC15
-  UC15 -[hidden]down-> UC16
-  UC16 -[hidden]down-> UC17
-  UC17 -[hidden]down-> UC18
-  UC18 -[hidden]down-> UC19
-  UC19 -[hidden]down-> UC20
-  UC20 -[hidden]down-> UC21
-}
+  ' 3-column grid layout
+  UC1  -[hidden]right-> UC2
+  UC2  -[hidden]right-> UC3
+  UC4  -[hidden]right-> UC5
+  UC5  -[hidden]right-> UC6
+  UC7  -[hidden]right-> UC8
+  UC8  -[hidden]right-> UC9
+  UC10 -[hidden]right-> UC11
+  UC11 -[hidden]right-> UC12
+  UC13 -[hidden]right-> UC14
+  UC14 -[hidden]right-> UC15
+  UC16 -[hidden]right-> UC17
+  UC17 -[hidden]right-> UC18
+  UC19 -[hidden]right-> UC20
+  UC20 -[hidden]right-> UC21
 
-actor "Admin"           as AD #EDE9FE
-actor "AI System"       as AI #FEF3C7
-actor "Payment System"  as PAY #D1FAE5
+  UC1  -[hidden]down-> UC4
+  UC4  -[hidden]down-> UC7
+  UC7  -[hidden]down-> UC10
+  UC10 -[hidden]down-> UC13
+  UC13 -[hidden]down-> UC16
+  UC16 -[hidden]down-> UC19
+}
 
 ' Applicant — left side
 AP -- UC1
