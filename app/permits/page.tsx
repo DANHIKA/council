@@ -44,14 +44,6 @@ export default function PermitsPage() {
 
     return (
         <div className="container mx-auto py-8 max-w-7xl space-y-8">
-            {/* Header */}
-            <div>
-                <h1 className="text-3xl font-bold tracking-tight">Permit Types</h1>
-                <p className="text-muted-foreground mt-1">
-                    Browse available permits and start your application
-                </p>
-            </div>
-
             {permitTypes.length === 0 ? (
                 <Alert>
                     <Info className="h-4 w-4" />

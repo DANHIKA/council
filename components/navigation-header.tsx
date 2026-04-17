@@ -2,8 +2,16 @@
 
 import { useEffect, useState } from "react";
 import { useSession, signOut } from "@/hooks/useSession";
-import { useRouter } from "next/navigation";
+import { useRouter, usePathname } from "next/navigation";
 import Link from "next/link";
+import {
+    Breadcrumb,
+    BreadcrumbItem,
+    BreadcrumbLink,
+    BreadcrumbList,
+    BreadcrumbPage,
+    BreadcrumbSeparator,
+} from "@/components/ui/breadcrumb";
 import { Button } from "@/components/ui/button";
 import { Avatar, AvatarFallback, AvatarImage } from "@/components/ui/avatar";
 import {
@@ -32,7 +40,6 @@ import {
     Notification01Icon,
     ArrowDown01Icon,
     Logout01Icon,
-    Note01Icon,
     UserIcon,
     UserGroupIcon
 } from "@hugeicons/core-free-icons";
@@ -44,6 +51,45 @@ import { ThemeToggle } from "@/components/theme-toggle";
 import { MobileSidebar } from "@/components/mobile-sidebar";
 import { ProfileSheet } from "@/components/profile-sheet";
 import { NotificationsSheet } from "@/components/notifications-sheet";
+
+type Crumb = { label: string; href?: string };
+
+function buildBreadcrumbs(pathname: string): Crumb[] {
+    const seg = pathname.split("/").filter(Boolean);
+    if (!seg.length) return [];
+
+    if (seg[0] === "dashboard") return [{ label: "Dashboard" }];
+    if (seg[0] === "permits") return [{ label: "Permits" }];
+    if (seg[0] === "chat") return [{ label: "AI Chat" }];
+    if (seg[0] === "profile") return [{ label: "Profile" }];
+    if (seg[0] === "map") return [{ label: "Map" }];
+
+    if (seg[0] === "applications") {
+        if (!seg[1]) return [{ label: "Applications" }];
+        return [{ label: "Applications", href: "/applications" }, { label: "Details" }];
+    }
+
+    if (seg[0] === "transactions") return [{ label: "Transactions" }];
+
+    if (seg[0] === "officer") {
+        if (seg[1] === "applications") return [{ label: "Officer" }, { label: "Review Queue" }];
+        if (seg[1] === "review") return [{ label: "Officer", href: "/officer/applications" }, { label: "Review Application" }];
+    }
+
+    if (seg[0] === "admin") {
+        const base: Crumb = { label: "Admin", href: "/admin" };
+        const labels: Record<string, string> = {
+            audit: "Audit Log",
+            permits: "Permit Types",
+            transactions: "Transactions",
+            withdrawals: "Withdrawals",
+        };
+        if (!seg[1]) return [{ label: "Admin" }];
+        return [base, { label: labels[seg[1]] ?? seg[1] }];
+    }
+
+    return [];
+}
 
 function useCommandPalette(userRole: string, router: ReturnType<typeof useRouter>) {
     const [open, setOpen] = useState(false);
@@ -72,6 +118,8 @@ function useCommandPalette(userRole: string, router: ReturnType<typeof useRouter
 export function NavigationHeader() {
     const { data: session, status } = useSession();
     const router = useRouter();
+    const pathname = usePathname();
+    const crumbs = buildBreadcrumbs(pathname);
     const { data: notificationsData } = useNotifications();
     useNotificationStream();
     const [mounted, setMounted] = useState(false);
@@ -133,9 +181,31 @@ export function NavigationHeader() {
         <>
         <header className="border-b bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/60 sticky top-0 z-50">
             <div className="flex h-16 items-center justify-between px-4 md:px-6">
-                {/* Spacer for alignment */}
-                <div className="flex items-center space-x-4">
+                <div className="flex items-center gap-3">
                     <MobileSidebar />
+                    {crumbs.length > 0 && (
+                        <Breadcrumb>
+                            <BreadcrumbList>
+                                {crumbs.map((crumb, i) => {
+                                    const isLast = i === crumbs.length - 1;
+                                    return (
+                                        <span key={i} className="inline-flex items-center gap-1.5">
+                                            {i > 0 && <BreadcrumbSeparator />}
+                                            <BreadcrumbItem>
+                                                {isLast || !crumb.href ? (
+                                                    <BreadcrumbPage>{crumb.label}</BreadcrumbPage>
+                                                ) : (
+                                                    <BreadcrumbLink render={<Link href={crumb.href} />}>
+                                                        {crumb.label}
+                                                    </BreadcrumbLink>
+                                                )}
+                                            </BreadcrumbItem>
+                                        </span>
+                                    );
+                                })}
+                            </BreadcrumbList>
+                        </Breadcrumb>
+                    )}
                 </div>
 
                 {/* User Menu */}

@@ -8,7 +8,7 @@ import {
 } from "@/components/ui/conversation";
 import { Message, MessageContent } from "@/components/ui/message";
 import { ShimmeringText } from "@/components/ui/shimmering-text";
-import { SentIcon, SparklesIcon } from "@hugeicons/core-free-icons";
+import { SparklesIcon } from "@hugeicons/core-free-icons";
 import { HugeiconsIcon } from "@hugeicons/react";
 import {
     Mic,
@@ -28,6 +28,8 @@ import { EnhancedMessageContent } from "@/components/chat/enhanced-message";
 import { ActionCard, executeAction, type ProposedAction, type ActionState } from "@/components/chat/action-card";
 import { SubSidebar, type ChatSession } from "@/components/chat/sub-sidebar";
 import { toast } from "sonner";
+
+// ── Types ─────────────────────────────────────────────────────────────────────
 
 type AIProvider = "groq" | "gemini" | "ollama";
 
@@ -49,6 +51,7 @@ interface ChatMessage {
     status: "complete" | "thinking";
     toolCalls?: ToolCall[];
     action?: ActionState;
+    suggestions?: string[];
 }
 
 interface SavedMessage {
@@ -57,6 +60,115 @@ interface SavedMessage {
     content: string;
     createdAt: string;
 }
+
+// ── ChatInputBar — module-level so it never remounts on parent re-render ──────
+
+interface ChatInputBarProps {
+    input: string;
+    onChange: (v: string) => void;
+    onSend: () => void;
+    disabled: boolean;
+    placeholder: string;
+    isListening: boolean;
+    onMicToggle: () => void;
+    micSupported: boolean;
+    selectedProvider: AIProvider;
+    onProviderChange: (p: AIProvider) => void;
+    inputRef?: React.RefObject<HTMLInputElement | null>;
+    className?: string;
+}
+
+function ChatInputBar({
+    input, onChange, onSend, disabled, placeholder,
+    isListening, onMicToggle, micSupported,
+    selectedProvider, onProviderChange,
+    inputRef, className,
+}: ChatInputBarProps) {
+    const [providerOpen, setProviderOpen] = useState(false);
+    const currentProvider = PROVIDERS.find(p => p.value === selectedProvider);
+
+    return (
+        <div className={cn("border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 p-3 shrink-0", className)}>
+            <div className="max-w-3xl mx-auto">
+                <form onSubmit={(e) => { e.preventDefault(); onSend(); }}>
+                    <div className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2">
+                        {micSupported && (
+                            <button
+                                type="button"
+                                onClick={onMicToggle}
+                                className={cn(
+                                    "shrink-0 p-1 rounded-md transition-colors",
+                                    isListening ? "text-red-500" : "text-muted-foreground hover:text-foreground"
+                                )}
+                            >
+                                {isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
+                            </button>
+                        )}
+                        <input
+                            ref={inputRef}
+                            placeholder={placeholder}
+                            value={input}
+                            onChange={(e) => onChange(e.target.value)}
+                            disabled={disabled}
+                            className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50 min-w-0"
+                            onKeyDown={(e) => {
+                                if (e.key === "Enter" && !e.shiftKey) {
+                                    e.preventDefault();
+                                    onSend();
+                                }
+                            }}
+                        />
+                        <div className="flex items-center gap-1 shrink-0">
+                            <div className="relative">
+                                <button
+                                    type="button"
+                                    onClick={() => setProviderOpen(o => !o)}
+                                    className="inline-flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
+                                >
+                                    {currentProvider?.label}
+                                    <ChevronDown className="h-3 w-3" />
+                                </button>
+                                {providerOpen && (
+                                    <div className="absolute bottom-full right-0 mb-1 w-44 bg-card border rounded-lg shadow-lg py-1 z-50">
+                                        {PROVIDERS.map((p) => (
+                                            <button
+                                                key={p.value}
+                                                type="button"
+                                                onClick={() => {
+                                                    onProviderChange(p.value);
+                                                    setProviderOpen(false);
+                                                }}
+                                                className={cn(
+                                                    "w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors",
+                                                    selectedProvider === p.value && "bg-muted font-medium"
+                                                )}
+                                            >
+                                                {p.label}
+                                                <span className="block text-muted-foreground text-[10px]">{p.model}</span>
+                                            </button>
+                                        ))}
+                                    </div>
+                                )}
+                            </div>
+                            <button
+                                type="submit"
+                                disabled={!input.trim() || disabled}
+                                className="h-7 w-7 flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors"
+                            >
+                                <Send className="h-3.5 w-3.5" />
+                            </button>
+                        </div>
+                    </div>
+                </form>
+                <p className="text-[11px] text-muted-foreground text-center mt-1.5">
+                    AI can make mistakes. Verify important information.
+                </p>
+            </div>
+        </div>
+    );
+}
+
+// ── Mic hook ──────────────────────────────────────────────────────────────────
 
 function useMicInput(onTranscript: (t: string) => void) {
     const [isListening, setIsListening] = useState(false);
@@ -88,29 +200,24 @@ function useMicInput(onTranscript: (t: string) => void) {
             r.stop();
             setIsListening(false);
         } else {
-            try {
-                r.start();
-                setIsListening(true);
-            } catch {
-                setIsListening(false);
-            }
+            try { r.start(); setIsListening(true); }
+            catch { setIsListening(false); }
         }
     }, [isListening]);
 
     const supported =
         typeof window !== "undefined" &&
-        !!(
-            (window as any).SpeechRecognition ||
-            (window as any).webkitSpeechRecognition
-        );
+        !!((window as any).SpeechRecognition || (window as any).webkitSpeechRecognition);
 
     return { isListening, toggle, supported };
 }
 
+// ── Helpers ───────────────────────────────────────────────────────────────────
+
 function getGreeting() {
-    const hour = new Date().getHours();
-    if (hour < 12) return "Good morning";
-    if (hour < 18) return "Good afternoon";
+    const h = new Date().getHours();
+    if (h < 12) return "Good morning";
+    if (h < 18) return "Good afternoon";
     return "Good evening";
 }
 
@@ -121,6 +228,8 @@ const SUGGESTIONS = [
     { icon: Workflow, label: "Process", prompt: "How does the application process work?" },
 ];
 
+// ── Page ──────────────────────────────────────────────────────────────────────
+
 export default function AIChatPage() {
     const { data: session } = useSession();
 
@@ -128,7 +237,6 @@ export default function AIChatPage() {
     const [input, setInput] = useState("");
     const [chatStatus, setChatStatus] = useState<"idle" | "sending" | "thinking" | "responding">("idle");
     const [selectedProvider, setSelectedProvider] = useState<AIProvider>("groq");
-    const [providerOpen, setProviderOpen] = useState(false);
 
     const [sessions, setSessions] = useState<ChatSession[]>([]);
     const [currentSessionId, setCurrentSessionId] = useState<string | null>(null);
@@ -137,38 +245,28 @@ export default function AIChatPage() {
     const [loadingSessions, setLoadingSessions] = useState(false);
     const [restoring, setRestoring] = useState(false);
 
+    const inputRef = useRef<HTMLInputElement>(null);
+
     const mic = useMicInput(
-        useCallback(
-            (t: string) => setInput((prev) => (prev ? `${prev} ${t}` : t)),
-            []
-        )
+        useCallback((t: string) => setInput(prev => prev ? `${prev} ${t}` : t), [])
     );
 
     const userRole = (session?.user as any)?.role;
     const userName = (session?.user as any)?.name || session?.user?.email?.split("@")[0] || "there";
     const isStaff = userRole === "OFFICER" || userRole === "ADMIN";
     const chatEndpoint = isStaff ? "/api/ai/staff-chat" : "/api/ai/chat";
-    const chatPlaceholder = isStaff
-        ? "Ask about applications, stats, workload..."
-        : "Type your question...";
+    const chatPlaceholder = isStaff ? "Ask about applications, stats, workload..." : "Type your question...";
 
     useEffect(() => {
-        if (session?.user?.id) {
-            loadSessions();
-        }
+        if (session?.user?.id) loadSessions();
     }, [session?.user?.id]);
 
     const loadSessions = async () => {
         setLoadingSessions(true);
         try {
             const res = await fetch("/api/chat-sessions");
-            if (res.ok) {
-                const data = await res.json();
-                setSessions(data);
-            }
-        } catch (e) {
-            console.error("Failed to load sessions", e);
-        }
+            if (res.ok) setSessions(await res.json());
+        } catch (e) { console.error("Failed to load sessions", e); }
         setLoadingSessions(false);
     };
 
@@ -187,9 +285,7 @@ export default function AIChatPage() {
                 setCurrentSessionId(data.id);
                 loadSessions();
             }
-        } catch (e) {
-            console.error("Failed to create session", e);
-        }
+        } catch (e) { console.error("Failed to create session", e); }
         if (window.innerWidth < 768) setSidebarOpen(false);
     };
 
@@ -202,17 +298,13 @@ export default function AIChatPage() {
                 setCurrentSessionId(data.id);
                 setSelectedProvider(data.provider as AIProvider);
                 setSessionTitleGenerated(true);
-                const saved: ChatMessage[] = data.messages.map((m: SavedMessage) => ({
+                setMessages(data.messages.map((m: SavedMessage) => ({
                     role: m.role as "user" | "assistant",
                     content: m.content,
                     status: "complete",
-                }));
-                setMessages(saved);
+                })));
             }
-        } catch (e) {
-            console.error("Failed to load session", e);
-            toast.error("Failed to load conversation");
-        }
+        } catch { toast.error("Failed to load conversation"); }
         setRestoring(false);
         if (window.innerWidth < 768) setSidebarOpen(false);
     };
@@ -230,9 +322,7 @@ export default function AIChatPage() {
                 loadSessions();
                 toast("Conversation deleted");
             }
-        } catch {
-            toast.error("Failed to delete");
-        }
+        } catch { toast.error("Failed to delete"); }
     };
 
     const generateTitle = async (firstMessage: string, sessionId: string) => {
@@ -249,9 +339,7 @@ export default function AIChatPage() {
                     loadSessions();
                 }
             }
-        } catch (e) {
-            console.error("Failed to generate title", e);
-        }
+        } catch (e) { console.error("Failed to generate title", e); }
     };
 
     const saveMessages = useCallback(async (newMessages: ChatMessage[], sessionId?: string | null) => {
@@ -263,18 +351,16 @@ export default function AIChatPage() {
                 headers: { "Content-Type": "application/json" },
                 body: JSON.stringify({
                     sessionId: sid,
-                    messages: newMessages.map((m) => ({ role: m.role, content: m.content })),
+                    messages: newMessages.map(m => ({ role: m.role, content: m.content })),
                 }),
             });
-        } catch (e) {
-            console.error("Failed to save messages", e);
-        }
+        } catch (e) { console.error("Failed to save messages", e); }
     }, [currentSessionId]);
 
-    const handleSend = async (overrideInput?: string) => {
-        const text = (overrideInput ?? input).trim();
+    const handleSend = async (overrideText?: string) => {
+        const text = (overrideText ?? input).trim();
         if (!text || chatStatus !== "idle") return;
-        if (!overrideInput) setInput("");
+        if (!overrideText) setInput("");
 
         let activeSessionId = currentSessionId;
         if (!activeSessionId) {
@@ -290,13 +376,11 @@ export default function AIChatPage() {
                     setCurrentSessionId(data.id);
                     loadSessions();
                 }
-            } catch (e) {
-                console.error("Failed to create session", e);
-            }
+            } catch (e) { console.error("Failed to create session", e); }
         }
 
         const userMsg: ChatMessage = { role: "user", content: text, status: "complete" };
-        setMessages((prev) => [...prev, userMsg]);
+        setMessages(prev => [...prev, userMsg]);
         setChatStatus("sending");
 
         if (!sessionTitleGenerated && activeSessionId) {
@@ -305,24 +389,19 @@ export default function AIChatPage() {
         }
 
         const history = messages
-            .filter((m) => m.status === "complete")
-            .map((m) => ({ role: m.role, content: m.content }));
+            .filter(m => m.status === "complete")
+            .map(m => ({ role: m.role, content: m.content }));
         history.push({ role: "user", content: text });
 
-        await new Promise((r) => setTimeout(r, 250));
+        await new Promise(r => setTimeout(r, 250));
         setChatStatus("thinking");
-        setMessages((prev) => [...prev, { role: "assistant", content: "", status: "thinking" }]);
+        setMessages(prev => [...prev, { role: "assistant", content: "", status: "thinking" }]);
 
         try {
             const res = await fetch(chatEndpoint, {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({
-                    messages: history,
-                    provider: selectedProvider,
-                    includeVisualization: true,
-                    includeActions: true,
-                }),
+                body: JSON.stringify({ messages: history, provider: selectedProvider, includeVisualization: true, includeActions: true }),
             });
             const data = await res.json();
             if (data.error) throw new Error(data.error);
@@ -340,26 +419,19 @@ export default function AIChatPage() {
                 : undefined;
 
             const assistantMsg: ChatMessage = {
-                role: "assistant",
-                content: data.response,
-                status: "complete",
-                toolCalls: toolCalls.length > 0 ? toolCalls : undefined,
-                action,
+                role: "assistant", content: data.response, status: "complete",
+                toolCalls: toolCalls.length > 0 ? toolCalls : undefined, action,
+                suggestions: data.suggestions,
             };
 
-            setMessages((prev) => [...prev.filter((m) => m.status !== "thinking"), assistantMsg]);
+            setMessages(prev => [...prev.filter(m => m.status !== "thinking"), assistantMsg]);
             setChatStatus("idle");
-
             saveMessages([userMsg, assistantMsg], activeSessionId);
             loadSessions();
         } catch {
-            setMessages((prev) => [
-                ...prev.filter((m) => m.status !== "thinking"),
-                {
-                    role: "assistant",
-                    content: "Sorry, I'm having trouble connecting right now. Please try again.",
-                    status: "complete",
-                },
+            setMessages(prev => [
+                ...prev.filter(m => m.status !== "thinking"),
+                { role: "assistant", content: "Sorry, I'm having trouble connecting right now. Please try again.", status: "complete" },
             ]);
             setChatStatus("idle");
         }
@@ -368,41 +440,39 @@ export default function AIChatPage() {
     const handleActionConfirm = async (messageIndex: number, notes?: string) => {
         const msg = messages[messageIndex];
         if (!msg?.action) return;
-        setMessages((prev) =>
-            prev.map((m, i) =>
-                i === messageIndex ? { ...m, action: { ...m.action!, status: "loading" } } : m
-            )
-        );
+        setMessages(prev => prev.map((m, i) => i === messageIndex ? { ...m, action: { ...m.action!, status: "loading" } } : m));
         try {
             const result = await executeAction(msg.action.proposal, notes);
-            setMessages((prev) =>
-                prev.map((m, i) =>
-                    i === messageIndex ? { ...m, action: { ...m.action!, status: "done", result } } : m
-                )
-            );
+            setMessages(prev => prev.map((m, i) => i === messageIndex ? { ...m, action: { ...m.action!, status: "done", result } } : m));
         } catch (err: any) {
             const errMsg = err?.message ?? "Something went wrong.";
-            setMessages((prev) =>
-                prev.map((m, i) =>
-                    i === messageIndex ? { ...m, action: { ...m.action!, status: "error", result: errMsg } } : m
-                )
-            );
+            setMessages(prev => prev.map((m, i) => i === messageIndex ? { ...m, action: { ...m.action!, status: "error", result: errMsg } } : m));
             toast.error("Action failed", { description: errMsg });
         }
     };
 
     const handleActionCancel = (messageIndex: number) => {
-        setMessages((prev) =>
-            prev.map((m, i) =>
-                i === messageIndex && m.action ? { ...m, action: { ...m.action, status: "cancelled" } } : m
-            )
-        );
+        setMessages(prev => prev.map((m, i) =>
+            i === messageIndex && m.action ? { ...m, action: { ...m.action, status: "cancelled" } } : m
+        ));
     };
 
-    const currentProvider = PROVIDERS.find((p) => p.value === selectedProvider);
-    const currentTitle = sessions.find((s) => s.id === currentSessionId)?.title;
+    const currentTitle = sessions.find(s => s.id === currentSessionId)?.title;
 
-    // ── Shared sidebar props ─────────────────────────────────────────────────────
+    const inputBarProps: ChatInputBarProps = {
+        input,
+        onChange: setInput,
+        onSend: handleSend,
+        disabled: chatStatus !== "idle",
+        placeholder: chatPlaceholder,
+        isListening: mic.isListening,
+        onMicToggle: mic.toggle,
+        micSupported: mic.supported,
+        selectedProvider,
+        onProviderChange: setSelectedProvider,
+        inputRef,
+    };
+
     const sidebarProps = {
         sessions,
         loading: loadingSessions,
@@ -412,143 +482,66 @@ export default function AIChatPage() {
         onNew: startNewChat,
     };
 
-    // ── Shared input bar ─────────────────────────────────────────────────────────
-    function InputBar({ className }: { className?: string }) {
-        return (
-            <div className={cn("border-t bg-background/95 backdrop-blur supports-[backdrop-filter]:bg-background/80 p-3", className)}>
-                <div className="max-w-3xl mx-auto">
-                    <form onSubmit={(e) => { e.preventDefault(); handleSend(); }}>
-                        <div className="flex items-center gap-2 rounded-xl border bg-background px-3 py-2">
-                            {mic.supported && (
-                                <button
-                                    type="button"
-                                    onClick={mic.toggle}
-                                    className={cn(
-                                        "shrink-0 p-1 rounded-md transition-colors",
-                                        mic.isListening ? "text-red-500" : "text-muted-foreground hover:text-foreground"
-                                    )}
-                                >
-                                    {mic.isListening ? <MicOff className="h-4 w-4" /> : <Mic className="h-4 w-4" />}
-                                </button>
-                            )}
-                            <input
-                                placeholder={chatPlaceholder}
-                                value={input}
-                                onChange={(e) => setInput(e.target.value)}
-                                disabled={chatStatus !== "idle"}
-                                className="flex-1 bg-transparent text-sm outline-none placeholder:text-muted-foreground disabled:opacity-50 min-w-0"
-                                onKeyDown={(e) => {
-                                    if (e.key === "Enter" && !e.shiftKey) {
-                                        e.preventDefault();
-                                        handleSend();
-                                    }
-                                }}
-                            />
-                            <div className="flex items-center gap-1 shrink-0">
-                                <div className="relative">
-                                    <button
-                                        type="button"
-                                        onClick={() => setProviderOpen(!providerOpen)}
-                                        className="inline-flex items-center gap-1 px-2 py-1 text-xs text-muted-foreground hover:text-foreground rounded-md hover:bg-muted transition-colors"
-                                    >
-                                        {currentProvider?.label}
-                                        <ChevronDown className="h-3 w-3" />
-                                    </button>
-                                    {providerOpen && (
-                                        <div className="absolute bottom-full right-0 mb-1 w-44 bg-card border rounded-lg shadow-lg py-1 z-50">
-                                            {PROVIDERS.map((p) => (
-                                                <button
-                                                    key={p.value}
-                                                    type="button"
-                                                    onClick={() => {
-                                                        setSelectedProvider(p.value);
-                                                        setProviderOpen(false);
-                                                    }}
-                                                    className={cn(
-                                                        "w-full text-left px-3 py-1.5 text-xs hover:bg-muted transition-colors",
-                                                        selectedProvider === p.value && "bg-muted font-medium"
-                                                    )}
-                                                >
-                                                    {p.label}
-                                                    <span className="block text-muted-foreground text-[10px]">{p.model}</span>
-                                                </button>
-                                            ))}
-                                        </div>
-                                    )}
-                                </div>
-                                <button
-                                    type="submit"
-                                    disabled={!input.trim() || chatStatus !== "idle"}
-                                    className="h-7 w-7 flex items-center justify-center rounded-lg bg-primary text-primary-foreground hover:bg-primary/90 disabled:opacity-40 transition-colors"
-                                >
-                                    <Send className="h-3.5 w-3.5" />
-                                </button>
-                            </div>
-                        </div>
-                    </form>
-                    <p className="text-[11px] text-muted-foreground text-center mt-1.5">
-                        AI can make mistakes. Verify important information.
-                    </p>
+    // ── Sidebar panels (shared) ──────────────────────────────────────────────
+
+    const MobileSidebar = sidebarOpen ? (
+        <div className="fixed inset-0 z-50 flex md:hidden">
+            <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
+            <div className="relative w-64 bg-card border-r flex flex-col">
+                <div className="flex items-center justify-between p-3 border-b">
+                    <span className="text-sm font-semibold">Conversations</span>
+                    <button onClick={() => setSidebarOpen(false)} className="text-muted-foreground hover:text-foreground">
+                        <X className="h-4 w-4" />
+                    </button>
+                </div>
+                <div className="flex-1 overflow-y-auto">
+                    <SubSidebar {...sidebarProps} />
                 </div>
             </div>
-        );
-    }
+        </div>
+    ) : null;
 
-    // ── Empty / welcome state ────────────────────────────────────────────────────
+    const DesktopSidebar = (
+        <div className="hidden md:flex w-52 border-r flex-col bg-muted/20">
+            <div className="px-3 py-3 border-b">
+                <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Conversations</span>
+            </div>
+            <div className="flex-1 overflow-y-auto">
+                <SubSidebar {...sidebarProps} />
+            </div>
+        </div>
+    );
+
+    // ── Empty / welcome state ────────────────────────────────────────────────
+
     if (messages.length === 0 && !restoring) {
         return (
-            <div className="flex h-full">
-                {/* Mobile sidebar overlay */}
-                {sidebarOpen && (
-                    <div className="fixed inset-0 z-50 flex md:hidden">
-                        <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-                        <div className="relative w-64 bg-card border-r flex flex-col">
-                            <div className="flex items-center justify-between p-3 border-b">
-                                <span className="text-sm font-semibold">Conversations</span>
-                                <button onClick={() => setSidebarOpen(false)} className="text-muted-foreground hover:text-foreground">
-                                    <X className="h-4 w-4" />
-                                </button>
-                            </div>
-                            <div className="flex-1 overflow-y-auto">
-                                <SubSidebar {...sidebarProps} />
-                            </div>
-                        </div>
-                    </div>
-                )}
+            <div className="absolute inset-0 flex overflow-hidden">
+                {MobileSidebar}
+                {DesktopSidebar}
 
-                {/* Desktop sidebar */}
-                <div className="hidden md:flex w-56 border-r flex-col bg-card/40">
-                    <div className="px-3 py-3 border-b">
-                        <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Conversations</span>
-                    </div>
-                    <div className="flex-1 overflow-y-auto">
-                        <SubSidebar {...sidebarProps} />
-                    </div>
-                </div>
-
-                {/* Welcome area */}
                 <div className="flex-1 flex flex-col overflow-hidden">
-                    <div className="flex-1 flex flex-col items-center justify-center px-4">
+                    <div className="flex-1 flex flex-col items-center justify-center px-6">
                         <button
-                            onClick={() => setSidebarOpen(!sidebarOpen)}
+                            onClick={() => setSidebarOpen(s => !s)}
                             className="absolute top-4 left-4 md:hidden p-2 text-muted-foreground hover:text-foreground"
                         >
                             <Menu className="h-5 w-5" />
                         </button>
 
-                        <div className="flex items-center gap-3 mb-6">
+                        <div className="flex items-center gap-3 mb-6 border-b-0">
                             <div className="h-9 w-9 rounded-full bg-primary/10 flex items-center justify-center">
                                 <HugeiconsIcon icon={SparklesIcon} className="h-4 w-4 text-primary" />
                             </div>
-                            <h1 className="text-3xl font-serif font-medium text-foreground">
+                            <p className="text-2xl font-serif font-medium">
                                 {getGreeting()}, {userName}
-                            </h1>
+                            </p>
                         </div>
 
                         <div className="w-full max-w-2xl">
-                            <InputBar />
+                            <ChatInputBar {...inputBarProps} />
                             <div className="flex flex-wrap items-center justify-center gap-2 mt-4">
-                                {SUGGESTIONS.map((s) => (
+                                {SUGGESTIONS.map(s => (
                                     <button
                                         key={s.label}
                                         onClick={() => handleSend(s.prompt)}
@@ -566,43 +559,18 @@ export default function AIChatPage() {
         );
     }
 
-    // ── Chat view ────────────────────────────────────────────────────────────────
+    // ── Chat view ────────────────────────────────────────────────────────────
+
     return (
-        <div className="flex h-full">
-            {/* Mobile sidebar overlay */}
-            {sidebarOpen && (
-                <div className="fixed inset-0 z-50 flex md:hidden">
-                    <div className="fixed inset-0 bg-black/50" onClick={() => setSidebarOpen(false)} />
-                    <div className="relative w-64 bg-card border-r flex flex-col">
-                        <div className="flex items-center justify-between p-3 border-b">
-                            <span className="text-sm font-semibold">Conversations</span>
-                            <button onClick={() => setSidebarOpen(false)} className="text-muted-foreground hover:text-foreground">
-                                <X className="h-4 w-4" />
-                            </button>
-                        </div>
-                        <div className="flex-1 overflow-y-auto">
-                            <SubSidebar {...sidebarProps} />
-                        </div>
-                    </div>
-                </div>
-            )}
+        <div className="absolute inset-0 flex overflow-hidden">
+            {MobileSidebar}
+            {DesktopSidebar}
 
-            {/* Desktop sidebar */}
-            <div className="hidden md:flex w-56 border-r flex-col bg-card/40">
-                <div className="px-3 py-3 border-b">
-                    <span className="text-xs font-semibold text-muted-foreground uppercase tracking-wide">Conversations</span>
-                </div>
-                <div className="flex-1 overflow-y-auto">
-                    <SubSidebar {...sidebarProps} />
-                </div>
-            </div>
-
-            {/* Chat area */}
             <div className="flex-1 flex flex-col overflow-hidden">
                 {/* Header */}
                 <header className="border-b bg-background/95 backdrop-blur px-4 py-2.5 flex items-center gap-3 shrink-0">
                     <button
-                        onClick={() => setSidebarOpen(!sidebarOpen)}
+                        onClick={() => setSidebarOpen(s => !s)}
                         className="p-1.5 -ml-1.5 text-muted-foreground hover:text-foreground md:hidden"
                     >
                         <Menu className="h-5 w-5" />
@@ -630,11 +598,7 @@ export default function AIChatPage() {
                                     <Message key={i} from={m.role} className="px-3 py-2">
                                         <MessageContent
                                             variant={m.role === "assistant" ? "flat" : "contained"}
-                                            className={
-                                                m.role === "assistant"
-                                                    ? "text-sm prose prose-sm dark:prose-invert max-w-none"
-                                                    : "text-sm"
-                                            }
+                                            className={m.role === "assistant" ? "text-sm chat-prose" : "text-sm"}
                                         >
                                             <EnhancedMessageContent message={m} />
                                             {m.action && (
@@ -642,11 +606,31 @@ export default function AIChatPage() {
                                                     action={m.action.proposal}
                                                     status={m.action.status}
                                                     result={m.action.result}
-                                                    onConfirm={(notes) => handleActionConfirm(i, notes)}
+                                                    onConfirm={notes => handleActionConfirm(i, notes)}
                                                     onCancel={() => handleActionCancel(i)}
                                                 />
                                             )}
                                         </MessageContent>
+                                        {/* Suggestion chips — only on last assistant message */}
+                                        {m.role === "assistant" && m.suggestions && m.suggestions.length > 0 && i === messages.length - 1 && chatStatus === "idle" && (
+                                            <div className="flex flex-wrap gap-2 mt-2 px-1">
+                                                {m.suggestions.map((s) => (
+                                                    <button
+                                                        key={s}
+                                                        onClick={() => {
+                                                            if (s === "Other") {
+                                                                inputRef.current?.focus();
+                                                            } else {
+                                                                handleSend(s);
+                                                            }
+                                                        }}
+                                                        className="inline-flex items-center px-3 py-1 rounded-full border text-xs text-foreground hover:bg-muted hover:border-foreground/20 bg-background transition-colors"
+                                                    >
+                                                        {s}
+                                                    </button>
+                                                ))}
+                                            </div>
+                                        )}
                                     </Message>
                                 )
                             )}
@@ -655,8 +639,8 @@ export default function AIChatPage() {
                     <ConversationScrollButton />
                 </Conversation>
 
-                {/* Input — sits naturally at the bottom of the flex column */}
-                <InputBar className="shrink-0" />
+                {/* Input */}
+                <ChatInputBar {...inputBarProps} />
             </div>
         </div>
     );

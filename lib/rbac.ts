@@ -61,24 +61,46 @@ export const ROUTE_ACCESS: { pattern: RegExp; roles: UserRole[] | null }[] = [
 // Drives the sidebar declaratively — no role logic inside the component.
 
 export const NAV_ITEMS = [
+    // ── Admin ──────────────────────────────────────
+    {
+        title: "Admin Dashboard",
+        href: "/admin",
+        icon: "DashboardCircleIcon" as const,
+        roles: ["ADMIN"] as UserRole[],
+    },
+    {
+        title: "Permit Types",
+        href: "/admin/permits",
+        icon: "File01Icon" as const,
+        roles: ["ADMIN"] as UserRole[],
+    },
+    {
+        title: "Audit Log",
+        href: "/admin/audit",
+        icon: "Note01Icon" as const,
+        roles: ["ADMIN"] as UserRole[],
+    },
+    // ── Applicant + Officer ────────────────────────
     {
         title: "Dashboard",
         href: "/dashboard",
         icon: "Home01Icon" as const,
-        roles: null, // visible to all
+        roles: ["APPLICANT", "OFFICER"] as UserRole[],
     },
     {
         title: "Permits",
         href: "/permits",
         icon: "File01Icon" as const,
-        roles: null, // visible to all
+        roles: ["APPLICANT", "OFFICER"] as UserRole[],
     },
+    // ── All roles ─────────────────────────────────
     {
         title: "AI Chat",
         href: "/chat",
         icon: "Chat01Icon" as const,
-        roles: null, // visible to all
+        roles: null,
     },
+    // ── Applicant only ────────────────────────────
     {
         title: "My Applications",
         href: "/applications",
@@ -91,6 +113,7 @@ export const NAV_ITEMS = [
         icon: "Money03Icon" as const,
         roles: ["APPLICANT"] as UserRole[],
     },
+    // ── Officer + Admin ───────────────────────────
     {
         title: "Review Queue",
         href: "/officer/applications",
@@ -108,18 +131,6 @@ export const NAV_ITEMS = [
         href: "/map",
         icon: "Location01Icon" as const,
         roles: ["OFFICER", "ADMIN"] as UserRole[],
-    },
-    {
-        title: "Admin Dashboard",
-        href: "/admin",
-        icon: "DashboardCircleIcon" as const,
-        roles: ["ADMIN"] as UserRole[],
-    },
-    {
-        title: "Audit Log",
-        href: "/admin/audit",
-        icon: "ClipboardListIcon" as const,
-        roles: ["ADMIN"] as UserRole[],
     },
 ] satisfies {
     title: string;
@@ -152,18 +163,7 @@ export function canAccessRoute(role: UserRole | undefined, pathname: string): bo
 /** Returns the nav items visible to the given role. */
 export function getNavItems(role: UserRole | undefined) {
     if (!role) return [];
-    const items = NAV_ITEMS.filter((item) =>
+    return NAV_ITEMS.filter((item) =>
         item.roles === null || item.roles.includes(role)
     );
-    
-    // For admin users, put Admin Dashboard first
-    if (role === "ADMIN") {
-        const adminIndex = items.findIndex(item => item.href === "/admin");
-        if (adminIndex > 0) {
-            const [adminItem] = items.splice(adminIndex, 1);
-            items.unshift(adminItem);
-        }
-    }
-    
-    return items;
 }

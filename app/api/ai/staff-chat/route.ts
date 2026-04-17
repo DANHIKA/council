@@ -564,8 +564,10 @@ const SYSTEM_PROMPT =
   `You are a friendly, conversational council permit management assistant for staff. ` +
   `When you have data, weave it into a natural reply — don't just dump numbers. ` +
   `Sound like a helpful colleague, not a dashboard. Keep it concise. ` +
+  `Use markdown: **bold** key figures and application references, bullet lists for grouped info. ` +
   `When an action has been identified (approve, reject, summarize etc.), briefly confirm what you found ` +
-  `and let the user know the action card below is ready for them to confirm.`;
+  `and let the user know the action card below is ready for them to confirm. ` +
+  `When you ask a question with 2–4 clear choices, append [SUGGEST: Choice A | Choice B | Other] at the end.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -611,14 +613,22 @@ export async function POST(req: NextRequest) {
     }
 
     // 4. Generate response
-    const response = await chat(
+    const rawResponse = await chat(
       [{ role: "system", content: systemWithData }, ...(messages as Message[])],
       200,
       provider
     );
 
+    // Parse and strip [SUGGEST: a | b | c] tag
+    const suggestionMatch = rawResponse.match(/\[SUGGEST:\s*([^\]]+)\]/i);
+    const suggestions = suggestionMatch
+      ? suggestionMatch[1].split("|").map((s: string) => s.trim()).filter(Boolean)
+      : undefined;
+    const response = rawResponse.replace(/\[SUGGEST:[^\]]*\]/gi, "").trim();
+
     return NextResponse.json({
       response,
+      suggestions,
       visualization: visualizationData,
       action: actionData,
     });

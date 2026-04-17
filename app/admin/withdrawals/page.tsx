@@ -85,11 +85,7 @@ export default function WithdrawalsPage() {
 
     return (
         <div className="container mx-auto py-8 max-w-7xl space-y-8">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold">Withdrawals</h1>
-                    <p className="text-muted-foreground">Manage your payment methods and withdrawal requests</p>
-                </div>
+            <div className="flex justify-end">
                 <Button
                     variant="outline"
                     onClick={() => fetchData()}

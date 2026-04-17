@@ -8,7 +8,7 @@ import type { ProposedAction } from "@/components/chat/action-card";
 
 // ── Intent classification ─────────────────────────────────────────────────────
 
-const INTENTS = ["greeting", "permit_recommendation", "document_requirements", "my_applications", "conversation"] as const;
+const INTENTS = ["greeting", "permit_recommendation", "document_requirements", "process_inquiry", "my_applications", "conversation"] as const;
 type Intent = typeof INTENTS[number];
 
 const VISUALIZATION_INTENTS = [
@@ -23,6 +23,7 @@ Intents:
 greeting              – hello, hi, how are you, social pleasantries
 permit_recommendation – what permit do I need, I want to build/open/start X, which permit for Y
 document_requirements – what documents do I need, what should I bring, checklist, requirements for a permit
+process_inquiry       – how does the process work, how do I apply, steps to apply, what happens after I submit, how long does it take, walk me through it
 my_applications       – my applications, my submissions, my permits, check my status, what is the status of my application, have I applied
 conversation          – anything else
 
@@ -208,8 +209,9 @@ Message: "${msg}"`;
 const SYSTEM_PROMPT =
   `You are a friendly council permit assistant helping members of the public. ` +
   `Be warm, clear, and conversational — like a helpful receptionist who knows permits inside out. ` +
-  `Keep answers concise. If you have data, weave it naturally into your reply. ` +
-  `When a navigation action is identified, briefly acknowledge it and note the card below will take them there.`;
+  `Use markdown formatting: **bold** key terms and document names, *italic* for emphasis, bullet lists for document requirements, numbered lists for sequential steps. ` +
+  `When a navigation action is identified, briefly acknowledge it and note the card below will take them there. ` +
+  `When you ask a question where the user has 2–4 clear choices, append [SUGGEST: Choice A | Choice B | Other] at the very end of your message — always include "Other" as the last option.`;
 
 export async function POST(req: NextRequest) {
   try {
@@ -261,6 +263,9 @@ export async function POST(req: NextRequest) {
       ? `${SYSTEM_PROMPT}\n\nYou are speaking with ${userName}.`
       : SYSTEM_PROMPT;
 
+    // Server-controlled suggestions — returned directly, not parsed from AI output
+    let serverSuggestions: string[] | undefined;
+
     if (intent === "permit_recommendation") {
       const { permitTypes, scenarios } = await fetchPermitData(lastMessage);
       const permitList = permitTypes.map(p => `- ${p.name}: ${p.description ?? ""}`).join("\n");
@@ -278,8 +283,50 @@ export async function POST(req: NextRequest) {
           `\nOptional documents: ${optional.join(", ") || "none"}` +
           `\n\nIMPORTANT: List ONLY the documents above — do not add, invent, or suggest any documents not in this list. Present them clearly and offer to help with the application.`;
       } else {
-        const permitList = permitTypes.map(p => p.name).join(", ");
-        systemWithData += `\n\nAvailable permit types: ${permitList}\n\nAsk which permit they're applying for so you can give them the exact document list. Do not guess or list requirements without knowing the specific permit.`;
+        // Return permit type chips directly — don't ask AI to list them
+        serverSuggestions = [...permitTypes.map(p => p.name), "Other"];
+        systemWithData +=
+          `\n\nThe user wants to know document requirements but hasn't said which permit. ` +
+          `Write ONE short friendly sentence asking which permit type they need documents for. ` +
+          `Do NOT list any permit types in your response — the UI will show selection buttons.`;
+      }
+    }
+
+    if (intent === "process_inquiry") {
+      const permitTypes = await prisma.permitType.findMany({
+        include: { requirements: { select: { label: true, required: true } } },
+        orderBy: { name: "asc" },
+      });
+
+      const allText = (messages as Message[]).map(m => m.content).join(" ").toLowerCase();
+      const matchedPermit = permitTypes
+        .filter(p => allText.includes(p.name.toLowerCase()))
+        .sort((a, b) => b.name.length - a.name.length)[0] ?? null;
+
+      const PROCESS_STEPS = [
+        "**Submit your application** with all required documents and pay the application fee.",
+        "**Officer review** — a council officer checks your submission for completeness and compliance.",
+        "**Corrections (if needed)** — you may be asked to provide additional information or correct documents.",
+        "**Admin sign-off** — once the officer recommends approval, an administrator grants final approval.",
+        "**Permit issued** — your permit certificate is generated and sent to you.",
+      ];
+
+      if (matchedPermit) {
+        const required = matchedPermit.requirements.filter(r => r.required).map(r => r.label);
+        const optional = matchedPermit.requirements.filter(r => !r.required).map(r => r.label);
+        systemWithData +=
+          `\n\nPermit type: ${matchedPermit.name}` +
+          `\nRequired documents: ${required.join(", ") || "none listed"}` +
+          `\nOptional documents: ${optional.join(", ") || "none"}` +
+          `\n\nApplication process steps (use exactly these, do not invent extra steps or timelines):\n${PROCESS_STEPS.map((s, i) => `${i + 1}. ${s}`).join("\n")}` +
+          `\n\nExplain the process for a ${matchedPermit.name}, weaving in the required documents. Do not add steps or timeframes not listed above.`;
+      } else {
+        // No permit mentioned — return all permit types as chips directly
+        serverSuggestions = [...permitTypes.map(p => p.name), "Other"];
+        systemWithData +=
+          `\n\nThe user asked about the application process but hasn't specified a permit type. ` +
+          `Write ONE short friendly sentence asking which permit they're applying for. ` +
+          `Do NOT list permit types in your response — the UI will show selection buttons below your message.`;
       }
     }
 
@@ -317,14 +364,22 @@ export async function POST(req: NextRequest) {
     }
 
     // 5. AI writes the response
-    const response = await chat(
+    const rawResponse = await chat(
       [{ role: "system", content: systemWithData }, ...(messages as Message[])],
       150,
       provider
     );
 
+    // Parse and strip [SUGGEST: a | b | c] tag
+    const suggestionMatch = rawResponse.match(/\[SUGGEST:\s*([^\]]+)\]/i);
+    const suggestions = suggestionMatch
+      ? suggestionMatch[1].split("|").map((s: string) => s.trim()).filter(Boolean)
+      : undefined;
+    const response = rawResponse.replace(/\[SUGGEST:[^\]]*\]/gi, "").trim();
+
     return NextResponse.json({
       response,
+      suggestions: serverSuggestions ?? suggestions,
       visualization: visualizationData,
       action: actionData,
     });

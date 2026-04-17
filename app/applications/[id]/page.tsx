@@ -163,10 +163,7 @@ function ApplicationDetailPageInner({ params }: { params: Promise<{ id: string }
                 <Button variant="ghost" size="icon" render={<Link href="/applications" />} className="rounded-full h-10 w-10">
                     <ArrowLeft className="h-5 w-5 text-muted-foreground" />
                 </Button>
-                <div>
-                    <h1 className="text-2xl font-bold">Application Details</h1>
-                    <p className="text-muted-foreground">{application.permitType}</p>
-                </div>
+                <p className="text-muted-foreground">{application.permitType}</p>
                 <Badge className={getStatusColor(application.status)}>
                     {getStatusLabel(application.status)}
                 </Badge>

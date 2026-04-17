@@ -179,14 +179,7 @@ export default function AdminPermitsPage() {
 
     return (
         <div className="space-y-6">
-            {/* Header */}
-            <div className="flex items-center justify-between">
-                <div>
-                    <h2 className="text-2xl font-bold tracking-tight">Permit Types</h2>
-                    <p className="text-muted-foreground mt-1">
-                        Manage available permit types and their configurations
-                    </p>
-                </div>
+            <div className="flex justify-end">
                 <Button onClick={openCreate}>
                     <Plus className="h-4 w-4 mr-2" />
                     Add Permit Type

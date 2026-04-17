@@ -204,13 +204,7 @@ export default function DashboardPage() {
 
     return (
         <div className="container mx-auto py-8 max-w-7xl space-y-8">
-            <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                <div>
-                    <h1 className="text-3xl font-bold tracking-tight">Dashboard</h1>
-                    <p className="text-muted-foreground">
-                        Welcome back, {session?.user?.name || "User"}
-                    </p>
-                </div>
+            <div className="flex justify-end">
                 <ApplicantOnly>
                     <Button render={<Link href="/applications?new=1" />}>
                         <PlusCircle className="h-4 w-4 mr-2" />
@@ -349,7 +343,7 @@ export default function DashboardPage() {
                                                                 </Button>
                                                             }
                                                         />
-                                                        <SheetContent className="w-[400px] sm:w-[540px]">
+                                                        <SheetContent className="w-[400px] sm:w-[540px] p-6">
                                                             <SheetHeader>
                                                                 <SheetTitle>{app.permitType}</SheetTitle>
                                                                 <SheetDescription>

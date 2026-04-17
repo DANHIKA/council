@@ -20,7 +20,7 @@ import {
 import { EmptyState } from "@/components/empty-state";
 import { formatDateTime } from "@/lib/utils";
 import {
-    ArrowLeft, CreditCard, CheckCircle2, Clock,
+    CreditCard, CheckCircle2, Clock,
     XCircle, ExternalLink, TrendingUp, Search, Loader2,
 } from "lucide-react";
 import Link from "next/link";
@@ -107,15 +107,6 @@ export default function AdminTransactionsPage() {
 
     return (
         <div className="container mx-auto py-8 max-w-6xl space-y-6">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" render={<Link href="/admin" />} className="rounded-full h-10 w-10">
-                    <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-                </Button>
-                <div>
-                    <h1 className="text-2xl font-bold">Transactions</h1>
-                    <p className="text-muted-foreground text-sm">All applicant payments across the portal</p>
-                </div>
-            </div>
 
             {/* Summary cards */}
             <div className="grid grid-cols-2 lg:grid-cols-4 gap-4">

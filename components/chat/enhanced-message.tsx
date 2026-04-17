@@ -19,6 +19,7 @@ export interface MessageWithTools {
     content: string;
     status: "complete" | "thinking";
     toolCalls?: ToolCall[];
+    suggestions?: string[];
 }
 
 interface EnhancedMessageContentProps {

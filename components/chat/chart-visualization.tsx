@@ -35,14 +35,16 @@ export interface ChartConfig {
     showLegend?: boolean;
 }
 
+// Solid colors — CSS variables don't resolve inside SVG fill attributes
 const DEFAULT_COLORS = [
-    "hsl(var(--primary))",
-    "hsl(var(--secondary))",
-    "hsl(var(--accent))",
-    "hsl(var(--destructive))",
-    "hsl(var(--success))",
-    "hsl(var(--warning))",
-    "hsl(var(--info))",
+    "#f87171", // red-400   ~ chart-1
+    "#60a5fa", // blue-400  ~ chart-2
+    "#a3e635", // lime-400  ~ chart-3
+    "#f472b6", // pink-400  ~ chart-4
+    "#4ade80", // green-400 ~ chart-5
+    "#fb923c", // orange-400
+    "#a78bfa", // violet-400
+    "#2dd4bf", // teal-400
 ];
 
 const CHART_HEIGHT = 300;
@@ -84,36 +86,34 @@ export function ChartVisualization({ config }: { config: ChartConfig }) {
             case "bar":
                 return (
                     <BarChart {...commonProps}>
-                        {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#374151" />}
+                        {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />}
                         <XAxis dataKey={xKey} tick={{ fontSize: 12 }} />
                         <YAxis tick={{ fontSize: 12 }} />
                         <Tooltip
-                            contentStyle={{
-                                backgroundColor: "hsl(var(--background))",
-                                border: "1px solid hsl(var(--border))",
-                                borderRadius: "8px",
-                            }}
+                            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
                         />
-                        {showLegend && <Legend />}
-                        <Bar dataKey={yKey} fill={colors[0]} radius={[4, 4, 0, 0]} />
+                        <Bar dataKey={yKey} radius={[4, 4, 0, 0]}>
+                            {data.map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            ))}
+                        </Bar>
                     </BarChart>
                 );
 
             case "horizontalBar":
                 return (
                     <BarChart {...commonProps} layout="vertical">
-                        {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#374151" />}
+                        {showGrid && <CartesianGrid strokeDasharray="3 3" stroke="#e5e7eb" />}
                         <XAxis type="number" tick={{ fontSize: 12 }} />
-                        <YAxis dataKey={xKey} type="category" tick={{ fontSize: 12 }} width={100} />
+                        <YAxis dataKey={xKey} type="category" tick={{ fontSize: 11 }} width={120} />
                         <Tooltip
-                            contentStyle={{
-                                backgroundColor: "hsl(var(--background))",
-                                border: "1px solid hsl(var(--border))",
-                                borderRadius: "8px",
-                            }}
+                            contentStyle={{ backgroundColor: "#fff", border: "1px solid #e5e7eb", borderRadius: "8px" }}
                         />
-                        {showLegend && <Legend />}
-                        <Bar dataKey={yKey} fill={colors[0]} radius={[0, 4, 4, 0]} />
+                        <Bar dataKey={yKey} radius={[0, 4, 4, 0]}>
+                            {data.map((_, index) => (
+                                <Cell key={`cell-${index}`} fill={colors[index % colors.length]} />
+                            ))}
+                        </Bar>
                     </BarChart>
                 );
 
@@ -138,8 +138,8 @@ export function ChartVisualization({ config }: { config: ChartConfig }) {
                         </Pie>
                         <Tooltip
                             contentStyle={{
-                                backgroundColor: "hsl(var(--background))",
-                                border: "1px solid hsl(var(--border))",
+                                backgroundColor: "#fff",
+                                border: "1px solid #e5e7eb",
                                 borderRadius: "8px",
                             }}
                         />
@@ -155,8 +155,8 @@ export function ChartVisualization({ config }: { config: ChartConfig }) {
                         <YAxis tick={{ fontSize: 12 }} />
                         <Tooltip
                             contentStyle={{
-                                backgroundColor: "hsl(var(--background))",
-                                border: "1px solid hsl(var(--border))",
+                                backgroundColor: "#fff",
+                                border: "1px solid #e5e7eb",
                                 borderRadius: "8px",
                             }}
                         />

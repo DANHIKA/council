@@ -90,13 +90,6 @@ export default function AdminAuditPage() {
 
     return (
         <div className="space-y-6">
-            <div>
-                <h2 className="text-2xl font-bold tracking-tight">Audit Log</h2>
-                <p className="text-muted-foreground mt-1">
-                    Track all admin actions across the system
-                </p>
-            </div>
-
             {/* Filters */}
             <Card>
                 <CardHeader className="pb-3">

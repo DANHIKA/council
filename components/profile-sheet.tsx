@@ -88,7 +88,11 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
         useForm<ProfileFormData>({ resolver: zodResolver(profileSchema) });
 
     useEffect(() => {
-        if (!open || !session) return;
+        if (!open) {
+            setUserData(null);
+            return;
+        }
+        if (!session) return;
         setLoading(true);
         profileApi.getProfile()
             .then(({ user }) => {
@@ -96,9 +100,12 @@ export function ProfileSheet({ open, onOpenChange }: ProfileSheetProps) {
                 setAvatarSrc(user.image ?? null);
                 reset({ name: user.name ?? "", phone: user.phone ?? "", organization: user.organization ?? "" });
             })
-            .catch(() => toast.error("Failed to load profile"))
+            .catch((err) => {
+                console.error("Failed to load profile:", err);
+                toast.error("Failed to load profile");
+            })
             .finally(() => setLoading(false));
-    }, [open, session, reset]);
+    }, [open, session]);
 
     const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const file = e.target.files?.[0];

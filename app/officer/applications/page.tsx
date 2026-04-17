@@ -165,13 +165,6 @@ export default function OfficerApplicationsPage() {
 
     return (
         <div className="container mx-auto py-8 max-w-7xl space-y-6">
-            <div className="flex items-center justify-between">
-                <div>
-                    <h1 className="text-2xl font-bold">Officer Dashboard</h1>
-                    <p className="text-muted-foreground">Review and manage permit applications</p>
-                </div>
-            </div>
-
             {/* Stats Cards */}
             <div className="grid gap-4 md:grid-cols-5">
                 {STATUS_STATS.map(({ status, label, color, icon: Icon }) => {

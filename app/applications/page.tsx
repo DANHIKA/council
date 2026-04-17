@@ -30,6 +30,7 @@ import {
 import { useApplication, useApplicationDocuments, useApplications } from "@/lib/queries";
 import { NewApplicationDialog } from "@/components/new-application-dialog";
 import { EmptyState } from "@/components/empty-state";
+import { usePermissions } from "@/hooks/usePermissions";
 
 function ApplicationQuickView({ id }: { id: string }) {
     const { data: application, isLoading } = useApplication(id);
@@ -116,6 +117,7 @@ const STATUS_OPTIONS = [
 function ApplicationsPageInner() {
     const { data: session, status } = useSession();
     const router = useRouter();
+    const { isStaff } = usePermissions();
     const searchParams = useSearchParams();
     const [search, setSearch] = useState("");
     const [statusFilter, setStatusFilter] = useState("all");
@@ -154,16 +156,14 @@ function ApplicationsPageInner() {
     return (
         <>
             <div className="container mx-auto py-8 space-y-6">
-                <div className="flex flex-col md:flex-row gap-4 items-start md:items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold">Applications</h1>
-                        <p className="text-sm text-muted-foreground mt-0.5">Track and manage your permit applications</p>
+                {!isStaff && (
+                    <div className="flex justify-end">
+                        <Button onClick={() => setNewDialogOpen(true)}>
+                            <PlusCircle className="h-4 w-4 mr-2" />
+                            New application
+                        </Button>
                     </div>
-                    <Button onClick={() => setNewDialogOpen(true)}>
-                        <PlusCircle className="h-4 w-4 mr-2" />
-                        New application
-                    </Button>
-                </div>
+                )}
 
                 {/* Filters */}
                 <div className="flex flex-col sm:flex-row gap-3">

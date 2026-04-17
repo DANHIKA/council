@@ -18,7 +18,7 @@ import {
 } from "@/components/ui/select";
 import { EmptyState } from "@/components/empty-state";
 import { formatDateTime } from "@/lib/utils";
-import { ArrowLeft, CreditCard, CheckCircle2, Clock, XCircle, ExternalLink, Loader2 } from "lucide-react";
+import { CreditCard, CheckCircle2, Clock, XCircle, ExternalLink, Loader2 } from "lucide-react";
 import Link from "next/link";
 
 type PaymentStatus = "PENDING" | "PAID" | "FAILED" | "WAIVED";
@@ -86,15 +86,6 @@ export default function TransactionsPage() {
 
     return (
         <div className="container mx-auto py-8 max-w-5xl space-y-6">
-            <div className="flex items-center gap-4">
-                <Button variant="ghost" size="icon" render={<Link href="/dashboard" />} className="rounded-full h-10 w-10">
-                    <ArrowLeft className="h-5 w-5 text-muted-foreground" />
-                </Button>
-                <div>
-                    <h1 className="text-2xl font-bold">My Transactions</h1>
-                    <p className="text-muted-foreground text-sm">Your payment history for all permit applications</p>
-                </div>
-            </div>
 
             {/* Summary cards */}
             <div className="grid grid-cols-1 sm:grid-cols-3 gap-4">

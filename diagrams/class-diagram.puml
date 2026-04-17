@@ -1,0 +1,175 @@
+@startuml class-diagram
+!theme vibrant
+skinparam classBackgroundColor #F8FAFC
+skinparam classBorderColor #6366F1
+skinparam classHeaderBackgroundColor #EEF2FF
+skinparam classHeaderFontColor #1E1B4B
+skinparam arrowColor #6366F1
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam shadowing false
+skinparam linetype ortho
+hide circle
+hide empty members
+
+title Council Permit Portal — Class Diagram
+
+' ══════════════════════════════════════════════════════════════
+'  ENTITIES
+' ══════════════════════════════════════════════════════════════
+
+class User {
+  + id : String <<PK>>
+  + name : String
+  + email : String <<unique>>
+  + role : APPLICANT | OFFICER | ADMIN
+  + supabaseId : String <<unique>>
+}
+
+class PermitType {
+  + id : String <<PK>>
+  + code : String <<unique>>
+  + name : String
+  + applicationFee : Float
+  + permitFee : Float
+  + validityMonths : Int?
+  + department : Department
+}
+
+class PermitRequirement {
+  + id : String <<PK>>
+  + key : String
+  + label : String
+  + required : Boolean
+  + acceptMime : String[]
+}
+
+class PermitApplication {
+  + id : String <<PK>>
+  + permitType : String
+  + description : String
+  + location : String?
+  + status : ApplicationStatus
+  + applicantId : String <<FK>>
+  + officerId : String? <<FK>>
+}
+
+class Document {
+  + id : String <<PK>>
+  + name : String
+  + fileUrl : String
+  + fileType : String
+  + status : PENDING | APPROVED | REJECTED
+  + requirementId : String? <<FK>>
+}
+
+class Payment {
+  + id : String <<PK>>
+  + txRef : String <<unique>>
+  + type : APPLICATION | PERMIT
+  + amount : Float
+  + status : PENDING | PAID | FAILED | WAIVED
+  + paychanguTxId : String?
+}
+
+class Comment {
+  + id : String <<PK>>
+  + content : String
+  + isInternal : Boolean
+}
+
+class Certificate {
+  + id : String <<PK>>
+  + certificateNo : String <<unique>>
+  + issueDate : DateTime
+  + expiryDate : DateTime?
+  + downloadCount : Int
+}
+
+class TimelineEvent {
+  + id : String <<PK>>
+  + event : String
+  + status : ApplicationStatus
+}
+
+class ReviewToken {
+  + id : String <<PK>>
+  + token : String <<unique>>
+  + action : FINAL_APPROVE | FINAL_REJECT
+  + used : Boolean
+  + expiresAt : DateTime
+}
+
+class ChatSession {
+  + id : String <<PK>>
+  + title : String?
+  + provider : groq | gemini | ollama
+  + messageCount : Int
+}
+
+class ChatMessage {
+  + id : String <<PK>>
+  + role : user | assistant
+  + content : String
+}
+
+class PaymentMethod {
+  + id : String <<PK>>
+  + type : BANK_ACCOUNT | MOBILE_MONEY
+  + details : Json
+  + isDefault : Boolean
+}
+
+class Withdrawal {
+  + id : String <<PK>>
+  + amount : Float
+  + status : PENDING | COMPLETED | FAILED
+  + reference : String?
+}
+
+class AuditLog {
+  + id : String <<PK>>
+  + action : CREATE | UPDATE | APPROVE | REJECT
+  + entityType : String
+  + entityId : String
+  + description : String?
+}
+
+class Notification {
+  + id : String <<PK>>
+  + title : String
+  + body : String
+  + read : Boolean
+}
+
+' ══════════════════════════════════════════════════════════════
+'  RELATIONSHIPS
+' ══════════════════════════════════════════════════════════════
+
+User "1" o-- "0..*" PermitApplication  : submits (applicant) >
+User "1" o-- "0..*" PermitApplication  : assigned to (officer) >
+User "1" o-- "0..*" Comment            : writes >
+User "1" o-- "0..*" ChatSession        : owns >
+User "1" o-- "0..*" PaymentMethod      : owns >
+User "1" o-- "0..*" Withdrawal         : requests >
+User "1" o-- "0..*" ReviewToken        : issues >
+User "1" o-- "0..*" AuditLog          : generates >
+User "1" o-- "0..*" Notification       : receives >
+
+PermitType "1" *-- "0..*" PermitRequirement  : defines >
+PermitType "1" o-- "0..*" PermitApplication  : categorises >
+
+PermitApplication "1" *-- "0..*" Document       : has >
+PermitApplication "1" *-- "0..*" Payment        : charges >
+PermitApplication "1" *-- "0..*" Comment        : has >
+PermitApplication "1" *-- "1"   Certificate    : produces >
+PermitApplication "1" *-- "0..*" TimelineEvent  : records >
+PermitApplication "1" *-- "0..*" ReviewToken    : generates >
+
+PermitRequirement "1" o-- "0..*" Document   : fulfilled by >
+
+ChatSession "1" *-- "0..*" ChatMessage : contains >
+
+PaymentMethod "1" o-- "0..*" Withdrawal : used by >
+
+@enduml
