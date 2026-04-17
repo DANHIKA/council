@@ -2,205 +2,89 @@
 !theme vibrant
 skinparam activityBackgroundColor #EEF2FF
 skinparam activityBorderColor #6366F1
-skinparam activityStartColor #4F46E5
-skinparam activityEndColor #4F46E5
-skinparam activityDiamondBackgroundColor #FFFBEB
-skinparam activityDiamondBorderColor #F59E0B
-skinparam arrowColor #6366F1
-skinparam swimlaneBackgroundColor #FAFAFA
-skinparam swimlaneBorderColor #CBD5E1
+skinparam activityFontColor #111827
+skinparam activityDiamondBackgroundColor #C7D2FE
+skinparam activityDiamondFontColor #111827
+skinparam activityArrowColor #6366F1
 skinparam defaultFontName Segoe UI
 skinparam defaultFontSize 11
+skinparam defaultFontColor #111827
 skinparam shadowing false
-skinparam ConditionStyle diamond
+skinparam noteBackgroundColor #FFFBEB
+skinparam noteBorderColor #F59E0B
+skinparam noteFontColor #111827
+skinparam swimlaneBorderColor #6366F1
+skinparam swimlaneTitleFontColor #111827
+skinparam swimlaneBackgroundColor #F8FAFC
 
-title Council Permit Portal — Application Lifecycle Activity Diagram
-
-|#DBEAFE| Applicant |
-|#D1FAE5| Officer |
-|#FEF3C7| Admin |
-|#E0E7FF| System |
+title Council Permit Portal — Application Lifecycle
 
 |Applicant|
 start
-
-:Register / Login;
-note right: Supabase JWT auth\nRole = APPLICANT
-
-:Browse permit catalogue\nor consult AI assistant;
-
-:Select permit type;
-
-:Fill in application form\n(description + location);
+:Browse permit catalogue
+or consult AI assistant;
+:Select a permit type;
+:Fill in application details;
+:Upload required documents;
+:Pay the application fee;
+:Submit the application;
 
 |System|
-:Create PermitApplication\n**status: SUBMITTED**;
+:Send confirmation email
+to the applicant;
+:Place application in
+the review queue;
 
-|Applicant|
-:Upload required documents\n(per PermitRequirement list);
+|Officer|
+:Open the review queue;
+:Claim the application;
+:Review each document;
 
-|System|
-repeat
-  :Validate file MIME type\nand extension;
-  :Store file in Supabase Storage;
-  :Create Document record\n(status: PENDING);
-repeat while (more required docs?) is (yes)
-->no;
-
-:Check: applicationFee > 0?;
-
-if (Fee required?) then (yes)
-  |Applicant|
-  :Click "Pay Now";
-
+if (All documents OK?) then (yes)
+  :Recommend Approval;
   |System|
-  :Create Payment record\n(status: PENDING)\nvia Paychangu API;
-
-  |Applicant|
-  :Complete payment on\nPaychangu hosted page;
-
-  |System|
-  :Receive payment callback\n(/api/payments/callback);
-  :Verify transaction with Paychangu;
-
-  if (Payment successful?) then (yes)
-    :Update Payment → **PAID**;
-  else (no)
-    :Update Payment → **FAILED**;
+  :Notify admin — ready for sign-off;
+  |Admin|
+  :Review the application;
+  if (Approve?) then (yes)
+    |System|
+    :Generate PDF certificate;
+    :Email certificate to applicant;
     |Applicant|
-    :Retry payment;
+    :Download certificate from portal;
+    stop
+  else (no)
+    |System|
+    :Notify applicant — application rejected;
     stop
   endif
-else (no / waived)
-  |System|
-  :Create Payment record\n(status: WAIVED);
-endif
-
-|Applicant|
-:Click "Submit Application";
-
-|System|
-:Validate: all required docs\nand payment PAID|WAIVED;
-
-if (Validation passes?) then (yes)
-  :Update PermitApplication\n**status: UNDER_REVIEW**;
-  :Create TimelineEvent\n"Submitted for Review";
-  :Send notification to Officers;
 else (no)
-  |Applicant|
-  :Fix missing docs or payment;
-  note right: Loops back to\nupload / pay steps
-  stop
-endif
-
-' ─────────────── OFFICER REVIEW ───────────────
-|Officer|
-:View review queue\n(/officer/applications);
-
-:Open application\n(/officer/review/{id});
-
-:Self-assign application;
-
-note right
-  Optional: Click
-  "Summarise with AI"
-  → POST /api/ai/summarize-application
-end note
-
-:Review documents, description,\nlocation, applicant details;
-
-if (Decision?) then (Requires Correction)
-  :Add correction notes\n(public comment);
-
-  |System|
-  :Update → **REQUIRES_CORRECTION**;
-  :Send correction email\nto Applicant;
-
-  |Applicant|
-  :Receive correction email;
-  :Upload corrected documents;
-  :Click "Resubmit";
-
-  |System|
-  :Update → **UNDER_REVIEW**;
-  :Create TimelineEvent;
-
-  |Officer|
-  note right: Returns to review loop
-  :Review updated application;
-
-elseif (Decision?) then (Reject)
-  :Add rejection reason;
-
-  |System|
-  :Update → **REJECTED**;
-  :Create TimelineEvent;
-  :Send rejection email\nto Applicant;
-
-  |Applicant|
-  :Receive rejection notification;
-  stop
-
-elseif (Decision?) then (Approve)
-  :Add approval notes;
-
-  |System|
-  :Update → **PENDING_APPROVAL**;
-  :Create TimelineEvent;
-
-  :Generate ReviewTokens for\neach Admin (APPROVE + REJECT)\nExpiry: 48 hours;
-
-  :Send sign-off email to\nall Admins with token links;
-endif
-
-' ─────────────── ADMIN SIGN-OFF ───────────────
-|Admin|
-:Receive sign-off email;
-:Click "Approve" or "Reject"\nlink in email;
-
-|System|
-:Validate ReviewToken\n(not used, not expired);
-
-if (Token valid?) then (no)
-  :Return 400 — token expired\nor already used;
-  |Admin|
-  :Check portal directly;
-  stop
-else (yes)
-  :Mark token as used;
-endif
-
-if (Admin action?) then (FINAL_APPROVE)
-  |System|
-  :Update → **APPROVED**;
-  :Set approvedAt timestamp;
-  :Generate Certificate\n{certificateNo, qrCode,\nissueDate, expiryDate};
-  :Create TimelineEvent\n"Certificate Issued";
-  :Send approval email\nto Applicant;
-  :Create Notification\nfor Applicant;
-
-  |Applicant|
-  :Receive approval notification;
-  :Open /applications/{id};
-  :Click "Download Certificate";
-
-  |System|
-  :Stream certificate PDF;
-  :Increment downloadCount;
-
-  |Applicant|
-  :Save / print permit certificate;
-  stop
-
-else (FINAL_REJECT)
-  |System|
-  :Update → **REJECTED**;
-  :Create TimelineEvent;
-  :Send rejection email to Applicant;
-
-  |Applicant|
-  :Receive rejection notification;
-  stop
+  if (Reject outright?) then (yes)
+    |Officer|
+    :Reject with a written reason;
+    |System|
+    :Notify applicant of rejection;
+    stop
+  else (request corrections)
+    |Officer|
+    :Request corrections and leave a note;
+    |System|
+    :Email correction details to applicant;
+    |Applicant|
+    :Read the note;
+    :Upload corrected documents;
+    :Resubmit;
+    |System|
+    :Return application to review queue;
+    note right
+      Application loops back
+      to the officer for
+      another round of review
+    end note
+    |Officer|
+    :Review the updated documents;
+    detach
+  endif
 endif
 
 @enduml

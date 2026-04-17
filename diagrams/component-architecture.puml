@@ -2,189 +2,124 @@
 !theme vibrant
 skinparam componentBackgroundColor #EEF2FF
 skinparam componentBorderColor #6366F1
-skinparam componentFontColor #1E1B4B
+skinparam componentFontColor #111827
 skinparam packageBackgroundColor #F8FAFC
 skinparam packageBorderColor #CBD5E1
+skinparam packageFontColor #111827
 skinparam databaseBackgroundColor #D1FAE5
 skinparam databaseBorderColor #059669
-skinparam arrowColor #6366F1
+skinparam databaseFontColor #111827
 skinparam cloudBackgroundColor #FEF3C7
-skinparam cloudBorderColor #D97706
+skinparam cloudBorderColor #F59E0B
+skinparam cloudFontColor #111827
 skinparam defaultFontName Segoe UI
 skinparam defaultFontSize 11
+skinparam defaultFontColor #111827
+skinparam arrowColor #6366F1
 skinparam shadowing false
-skinparam rectangleBackgroundColor #F0FDF4
-skinparam rectangleBorderColor #6366F1
+skinparam noteBackgroundColor #FFFBEB
+skinparam noteBorderColor #F59E0B
+skinparam noteFontColor #111827
 
-title Council Permit Portal — Component & Architecture Diagram
+title Council Permit Portal — Component Architecture
 
-' ══════════════════════════════════════════════════════════════════
-'  EXTERNAL SERVICES
-' ══════════════════════════════════════════════════════════════════
-cloud "Supabase Cloud" as SUP {
-  database "PostgreSQL\n(Permits DB)" as PG
-  component "Supabase Auth\n(JWT)" as SAUTH
-  component "Supabase Storage\n(permit-documents)" as SS3
-}
+package "Next.js Application" {
 
-cloud "AI Providers" as AICLOUD {
-  component "Groq API\n(Llama 3 / Mixtral)" as GROQ
-  component "Google Gemini\n2.0 Flash" as GEM
-  component "Ollama\n(local LLM)" as OLL
-}
-
-cloud "Third-Party Services" as EXT {
-  component "Paychangu\n(Payment Gateway)" as PAY
-  component "SMTP / Email\nService" as EMAIL
-}
-
-' ══════════════════════════════════════════════════════════════════
-'  NEXT.JS APPLICATION
-' ══════════════════════════════════════════════════════════════════
-rectangle "Next.js 15 Application (App Router)" as APP {
-
-  ' ── Frontend Pages ──
-  package "Frontend Pages (React / TSX)" as PAGES {
-    component "/dashboard"              as P_DASH
-    component "/applications/[id]"      as P_APP
-    component "/permits"                as P_PERM
-    component "/officer/review/[id]"    as P_REV
-    component "/admin"                  as P_ADMIN
-    component "/chat"                   as P_CHAT
-    component "/auth/login|register"    as P_AUTH
+  package "Pages (App Router)" {
+    [Dashboard]            as DASH
+    [Applications]         as APPS
+    [New Application]      as NEW_APP
+    [Application Detail]   as APP_DETAIL
+    [Review Queue]         as OFF_QUEUE
+    [Review Application]   as OFF_REVIEW
+    [Admin Dashboard]      as ADMIN_DASH
+    [Permit Types (Admin)] as ADMIN_PERMITS
+    [Users (Admin)]        as ADMIN_USERS
+    [Audit Log (Admin)]    as ADMIN_AUDIT
+    [Permit Map]           as MAP
+    [AI Chat]              as CHAT
   }
 
-  ' ── Reusable Components ──
-  package "Reusable Components" as COMP {
-    component "Sidebar"                 as C_SB
-    component "SubSidebar"             as C_SSB
-    component "NavigationHeader"        as C_NAV
-    component "AIChatSupport\n(floating)" as C_AI
-    component "NewApplicationSheet"     as C_NEW
-    component "EditApplicationSheet"    as C_EDIT
-    component "PaymentCard"             as C_PAY
-    component "FileUpload"              as C_FILE
-    component "LocationPicker"          as C_MAP
-    component "PermissionGuard"         as C_PG
-    component "ChartVisualization\n(Recharts)" as C_CHART
-    component "EnhancedMessage"         as C_MSG
-    component "ActionCard"              as C_ACT
+  package "Components" {
+    [Navigation Header\n+ Breadcrumbs] as NAV
+    [Application Form]     as FORM
+    [Document Uploader]    as UPLOADER
+    [Chat Interface]       as CHAT_UI
+    [Chart Visualizations] as CHARTS
   }
 
-  ' ── State & Hooks ──
-  package "State Management" as STATE {
-    component "UserContext\n(useSession)" as S_USER
-    component "React Query\n(@tanstack)" as S_RQ
-    component "usePermissions()" as S_PERM
+  package "API Routes" {
+    [Applications API]  as API_APPS
+    [Documents API]     as API_DOCS
+    [Payments API]      as API_PAY
+    [AI Chat API]       as API_CHAT
+    [Admin API]         as API_ADMIN
+    [Officer API]       as API_OFF
+    [Certificates API]  as API_CERT
+    [Notifications API] as API_NOTIF
   }
 
-  ' ── API Routes ──
-  package "API Routes (/app/api)" as ROUTES {
-    ' Auth
-    component "/api/auth/register"      as R_REG
-    component "/api/auth/[...nextauth]" as R_AUTH
-
-    ' Applications
-    component "/api/applications"       as R_APPS
-    component "/api/applications/[id]/submit"    as R_SUB
-    component "/api/applications/[id]/documents" as R_DOCS
-    component "/api/applications/[id]/resubmit"  as R_RESUB
-
-    ' Payments
-    component "/api/payments/initiate"  as R_PINIT
-    component "/api/payments/callback"  as R_PCALLBACK
-
-    ' Officer
-    component "/api/officer/applications/[id]/decision" as R_DEC
-    component "/api/officer/applications/[id]/assign"   as R_ASN
-
-    ' Admin
-    component "/api/admin/applications/[id]/signoff" as R_SIGN
-    component "/api/admin/permit-types"              as R_PT
-    component "/api/admin/users"                     as R_USR
-    component "/api/admin/withdrawals"               as R_WD
-    component "/api/admin/audit-log"                 as R_AL
-
-    ' AI
-    component "/api/ai/chat"                    as R_CHAT
-    component "/api/ai/staff-chat"              as R_SCHAT
-    component "/api/ai/recommend-permit"        as R_REC
-    component "/api/ai/summarize-application"   as R_SUM
-
-    ' Notifications
-    component "/api/notifications/stream\n(SSE)" as R_SSE
-  }
-
-  ' ── Libraries ──
-  package "Libraries & Utilities" as LIB {
-    component "lib/auth.ts\n(auth() fn)" as L_AUTH
-    component "lib/rbac.ts\n(permissions)" as L_RBAC
-    component "lib/prisma.ts\n(ORM client)" as L_DB
-    component "lib/ai-provider.ts\n(Groq|Gemini|Ollama)" as L_AI
-    component "lib/ai-scenarios.ts\n(intent scenarios)" as L_SC
-    component "lib/supabase/server.ts" as L_SUP
-    component "streamdown\n(markdown render)" as L_MD
+  package "Libraries" {
+    [RBAC\n(lib/rbac)]       as RBAC
+    [Prisma\n(Database Client)] as PRISMA
+    [Supabase SDK\n(File Storage)] as STORAGE
+    [Email Service]          as EMAIL_LIB
+    [PDF Generator]          as PDF
   }
 }
 
-' ══════════════════════════════════════════════════════════════════
-'  CONNECTIONS — Frontend → Components
-' ══════════════════════════════════════════════════════════════════
-P_CHAT --> C_SSB  : uses
-P_CHAT --> C_AI   : embeds
-P_CHAT --> C_CHART : renders
-P_CHAT --> C_MSG  : renders
-P_CHAT --> C_ACT  : renders
-P_APP  --> C_EDIT : opens
-P_APP  --> C_PAY  : embeds
-P_APP  --> C_FILE : embeds
-P_AUTH --> S_USER : sets session
+package "External Services" {
+  database "Supabase Cloud\n(PostgreSQL + File Storage)" as SUPA #D1FAE5
+  cloud "AI Providers\n(Groq / Gemini / Ollama)"         as AI_SVC #FEF3C7
+  [Paychangu\n(Payments)]                                as PAYCHANGU #D1FAE5
+  [Email Provider\n(SMTP / SendGrid)]                    as EMAIL_SVC #FEF3C7
+}
 
-C_SB   --> S_USER  : reads role
-C_PG   --> S_USER  : reads role
-C_PG   --> L_RBAC  : checks permissions
-C_NEW  --> C_FILE  : embeds
-C_NEW  --> C_MAP   : embeds
+' Pages → Components
+APPS      --> FORM
+NEW_APP   --> FORM
+NEW_APP   --> UPLOADER
+APP_DETAIL --> UPLOADER
+CHAT      --> CHAT_UI
+CHAT_UI   --> CHARTS
 
-' ══════════════════════════════════════════════════════════════════
-'  CONNECTIONS — Frontend → API Routes
-' ══════════════════════════════════════════════════════════════════
-PAGES  --> R_AUTH  : login/logout
-PAGES  --> R_APPS  : CRUD
-C_FILE --> R_DOCS  : upload
-C_PAY  --> R_PINIT : initiate payment
-P_CHAT --> R_CHAT  : chat messages
-C_AI   --> R_CHAT  : floating chat
-P_REV  --> R_DEC   : submit decision
-P_REV  --> R_SUM   : AI summarise
-P_ADMIN --> R_SIGN : final approval
-P_ADMIN --> R_PT   : manage permits
-PAGES  --> R_SSE   : real-time events
+' Pages → API Routes
+APPS       --> API_APPS
+APP_DETAIL --> API_APPS
+APP_DETAIL --> API_DOCS
+NEW_APP    --> API_APPS
+OFF_QUEUE  --> API_OFF
+OFF_REVIEW --> API_OFF
+OFF_REVIEW --> API_DOCS
+ADMIN_DASH     --> API_ADMIN
+ADMIN_PERMITS  --> API_ADMIN
+ADMIN_USERS    --> API_ADMIN
+ADMIN_AUDIT    --> API_ADMIN
+CHAT       --> API_CHAT
 
-' ══════════════════════════════════════════════════════════════════
-'  CONNECTIONS — API Routes → Libraries
-' ══════════════════════════════════════════════════════════════════
-ROUTES --> L_AUTH   : verify session
-ROUTES --> L_DB     : query database
-R_CHAT --> L_AI     : call AI provider
-R_CHAT --> L_SC     : classify intent
-R_SCHAT --> L_AI    : call AI provider
-R_REG  --> L_SUP    : Supabase client
-R_DOCS --> L_SUP    : upload to storage
-R_CHAT --> L_MD     : format response
-L_AUTH --> L_SUP    : validate JWT
+' API Routes → Libraries
+API_APPS   --> PRISMA
+API_DOCS   --> PRISMA
+API_DOCS   --> STORAGE
+API_PAY    --> PRISMA
+API_CHAT   --> PRISMA
+API_ADMIN  --> PRISMA
+API_OFF    --> PRISMA
+API_CERT   --> PDF
+API_CERT   --> STORAGE
+API_NOTIF  --> EMAIL_LIB
 
-' ══════════════════════════════════════════════════════════════════
-'  CONNECTIONS — Libraries → External
-' ══════════════════════════════════════════════════════════════════
-L_DB   --> PG       : SQL queries (Prisma)
-L_SUP  --> SAUTH    : JWT validation
-L_SUP  --> SS3      : file storage
-L_AI   --> GROQ     : Groq chat API
-L_AI   --> GEM      : Gemini chat API
-L_AI   --> OLL      : Ollama local API
-R_PINIT --> PAY     : create checkout
-R_PCALLBACK --> PAY : verify payment
-ROUTES --> EMAIL    : send alerts
+' Libraries → External Services
+PRISMA     --> SUPA
+STORAGE    --> SUPA
+API_PAY    --> PAYCHANGU
+API_CHAT   --> AI_SVC
+EMAIL_LIB  --> EMAIL_SVC
+
+' RBAC used across pages and nav
+RBAC --> NAV
+RBAC --> API_APPS
+RBAC --> API_ADMIN
+RBAC --> API_OFF
 
 @enduml

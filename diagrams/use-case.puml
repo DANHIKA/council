@@ -1,139 +1,109 @@
 @startuml use-case
 !theme vibrant
-skinparam actorStyle awesome
-skinparam usecaseBackgroundColor #EEF2FF
-skinparam usecaseBorderColor #4F46E5
+left to right direction
+
+skinparam defaultFontName Segoe UI
+skinparam defaultFontSize 11
+skinparam defaultFontColor #111827
+skinparam shadowing false
 skinparam actorBackgroundColor #DBEAFE
 skinparam actorBorderColor #1D4ED8
-skinparam packageBackgroundColor #F8FAFC
-skinparam packageBorderColor #CBD5E1
-skinparam ArrowColor #6366F1
-skinparam defaultFontName Segoe UI
-skinparam defaultFontSize 12
-skinparam shadowing false
+skinparam usecaseBackgroundColor #EEF2FF
+skinparam usecaseBorderColor #6366F1
+skinparam usecaseFontColor #111827
+skinparam actorFontColor #111827
+skinparam noteBackgroundColor #FFFBEB
+skinparam noteBorderColor #F59E0B
+skinparam noteFontColor #111827
+skinparam rectangleBackgroundColor #F8FAFC
+skinparam rectangleBorderColor #6366F1
+skinparam rectangleFontColor #111827
 
 title Council Permit Portal — Use Case Diagram
 
-' ─────────────────────────── Actors ───────────────────────────
-actor "Applicant" as AP #DBEAFE
-actor "Officer"   as OF #D1FAE5
-actor "Admin"     as AD #FEF3C7
-actor "AI System" as AI #F3E8FF
-actor "Paychangu\n(Payment GW)" as PG #FFE4E6
+actor "Applicant"       as AP #DBEAFE
+actor "Officer"         as OF #E0E7FF
 
-' ─────────────────────────── Packages ──────────────────────────
+rectangle "Council Permit Portal" {
+  usecase "Browse Permit Catalogue"   as UC1
+  usecase "Start Application"         as UC2
+  usecase "Upload Documents"          as UC3
+  usecase "Pay Application Fee"       as UC4
+  usecase "Submit Application"        as UC5
+  usecase "Track Application Status"  as UC6
+  usecase "Download Certificate"      as UC7
+  usecase "Chat with AI Assistant"    as UC8
+  usecase "View Review Queue"         as UC9
+  usecase "Claim & Review Application" as UC10
+  usecase "Approve / Reject Documents" as UC11
+  usecase "AI Summarise Application"  as UC12
+  usecase "Recommend Approval"        as UC13
+  usecase "Request Corrections"       as UC14
+  usecase "Reject Application"        as UC15
+  usecase "Final Sign-off"            as UC16
+  usecase "Manage Permit Types"       as UC17
+  usecase "Manage Users"              as UC18
+  usecase "View Audit Log"            as UC19
+  usecase "Manage Withdrawals"        as UC20
+  usecase "Renew Certificate"         as UC21
 
-package "Authentication" {
-  usecase "Register Account"          as UC_REG
-  usecase "Login"                     as UC_LOGIN
-  usecase "Update Profile"            as UC_PROFILE
+  ' Force a single vertical column
+  UC1  -[hidden]down-> UC2
+  UC2  -[hidden]down-> UC3
+  UC3  -[hidden]down-> UC4
+  UC4  -[hidden]down-> UC5
+  UC5  -[hidden]down-> UC6
+  UC6  -[hidden]down-> UC7
+  UC7  -[hidden]down-> UC8
+  UC8  -[hidden]down-> UC9
+  UC9  -[hidden]down-> UC10
+  UC10 -[hidden]down-> UC11
+  UC11 -[hidden]down-> UC12
+  UC12 -[hidden]down-> UC13
+  UC13 -[hidden]down-> UC14
+  UC14 -[hidden]down-> UC15
+  UC15 -[hidden]down-> UC16
+  UC16 -[hidden]down-> UC17
+  UC17 -[hidden]down-> UC18
+  UC18 -[hidden]down-> UC19
+  UC19 -[hidden]down-> UC20
+  UC20 -[hidden]down-> UC21
 }
 
-package "Permit Discovery" {
-  usecase "Browse Permit Catalogue"   as UC_BROWSE
-  usecase "Get AI Permit\nRecommendation" as UC_REC
-  usecase "View Permit Requirements"  as UC_REQ
-  usecase "Chat with AI Assistant"    as UC_CHAT
-}
+actor "Admin"           as AD #EDE9FE
+actor "AI System"       as AI #FEF3C7
+actor "Payment System"  as PAY #D1FAE5
 
-package "Permit Application" {
-  usecase "Create Application"        as UC_CREATE
-  usecase "Upload Documents"          as UC_UPLOAD
-  usecase "Pay Application Fee"       as UC_PAY
-  usecase "Submit Application"        as UC_SUBMIT
-  usecase "Resubmit After Correction" as UC_RESUB
-  usecase "Download Certificate"      as UC_CERT
-  usecase "Track Application Status"  as UC_TRACK
-}
+' Applicant — left side
+AP -- UC1
+AP -- UC2
+AP -- UC3
+AP -- UC4
+AP -- UC5
+AP -- UC6
+AP -- UC7
+AP -- UC8
 
-package "Officer Review" {
-  usecase "View Review Queue"         as UC_QUEUE
-  usecase "Assign Application"        as UC_ASSIGN
-  usecase "Review Documents"          as UC_REVDOC
-  usecase "AI Summarise Application"  as UC_SUMM
-  usecase "Approve / Recommend"       as UC_APPROVE
-  usecase "Reject Application"        as UC_REJECT
-  usecase "Require Corrections"       as UC_CORR
-  usecase "Add Internal Comment"      as UC_ICOMM
-}
+' Officer — left side
+OF -- UC9
+OF -- UC10
+OF -- UC11
+OF -- UC12
+OF -- UC13
+OF -- UC14
+OF -- UC15
 
-package "Admin Management" {
-  usecase "Final Sign-off (APPROVE)"  as UC_SIGN
-  usecase "Final Sign-off (REJECT)"   as UC_SREJECT
-  usecase "Manage Permit Types"       as UC_PTYPE
-  usecase "Manage Users"              as UC_USERS
-  usecase "View Audit Log"            as UC_AUDIT
-  usecase "Manage Withdrawals"        as UC_WITH
-  usecase "Renew Certificate"         as UC_RENEW
-}
+' Admin — right side (reverse direction keeps actor on the right)
+UC16 -- AD
+UC17 -- AD
+UC18 -- AD
+UC19 -- AD
+UC20 -- AD
+UC21 -- AD
 
-package "Notifications" {
-  usecase "Receive Real-time\nNotifications (SSE)" as UC_NOTIF
-  usecase "Receive Email Alerts"      as UC_EMAIL
-}
-
-' ─────────────────────────── Applicant ─────────────────────────
-AP --> UC_REG
-AP --> UC_LOGIN
-AP --> UC_PROFILE
-AP --> UC_BROWSE
-AP --> UC_REC
-AP --> UC_REQ
-AP --> UC_CHAT
-AP --> UC_CREATE
-AP --> UC_UPLOAD
-AP --> UC_PAY
-AP --> UC_SUBMIT
-AP --> UC_RESUB
-AP --> UC_CERT
-AP --> UC_TRACK
-AP --> UC_NOTIF
-AP --> UC_EMAIL
-
-' ─────────────────────────── Officer ───────────────────────────
-OF --> UC_LOGIN
-OF --> UC_QUEUE
-OF --> UC_ASSIGN
-OF --> UC_REVDOC
-OF --> UC_SUMM
-OF --> UC_APPROVE
-OF --> UC_REJECT
-OF --> UC_CORR
-OF --> UC_ICOMM
-OF --> UC_CHAT
-OF --> UC_NOTIF
-OF --> UC_EMAIL
-
-' ─────────────────────────── Admin ─────────────────────────────
-AD --> UC_LOGIN
-AD --> UC_QUEUE
-AD --> UC_SIGN
-AD --> UC_SREJECT
-AD --> UC_PTYPE
-AD --> UC_USERS
-AD --> UC_AUDIT
-AD --> UC_WITH
-AD --> UC_RENEW
-AD --> UC_CHAT
-AD --> UC_EMAIL
-
-' ─────────────────────────── AI System ─────────────────────────
-AI --> UC_REC
-AI --> UC_CHAT
-AI --> UC_SUMM
-
-' ─────────────────────────── Payment GW ────────────────────────
-PG --> UC_PAY
-
-' ─────────────────────────── Include / Extend ──────────────────
-UC_SUBMIT  ..> UC_PAY      : <<include>>
-UC_SUBMIT  ..> UC_UPLOAD   : <<include>>
-UC_RESUB   ..> UC_UPLOAD   : <<include>>
-UC_SIGN    ..> UC_EMAIL    : <<include>>
-UC_APPROVE ..> UC_EMAIL    : <<include>>
-UC_REJECT  ..> UC_EMAIL    : <<include>>
-UC_CORR    ..> UC_EMAIL    : <<include>>
-UC_SUMM    ..> AI          : <<include>>
-UC_CERT    ..> UC_SIGN     : <<extend>>
+' External systems — right side
+UC4  -- PAY
+UC8  -- AI
+UC12 -- AI
 
 @enduml

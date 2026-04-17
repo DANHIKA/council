@@ -12,84 +12,96 @@ skinparam noteBackgroundColor #FFFBEB
 skinparam noteBorderColor #F59E0B
 skinparam defaultFontName Segoe UI
 skinparam defaultFontSize 11
+skinparam defaultFontColor #111827
 skinparam shadowing false
+skinparam sequenceParticipantFontColor #111827
+skinparam sequenceActorFontColor #111827
+skinparam sequenceMessageFontColor #111827
+skinparam sequenceGroupFontColor #111827
+skinparam noteFontColor #111827
 
-title Council Permit Portal — AI Chat Sequence
+title Council Permit Portal — How the AI Chat Works
 
-actor User as U #DBEAFE
-participant "Chat UI" as UI #E0E7FF
-participant "API /ai/chat" as API #EDE9FE
-participant "DB"          as DB #D1FAE5
-participant "AI Provider\n(Groq / Gemini)" as AI #FEF3C7
+actor "User\n(Any role)" as U #DBEAFE
+participant "Chat\nScreen"      as UI #E0E7FF
+participant "System\n(Server + Database)" as SYS #EDE9FE
+participant "AI\n(Groq / Gemini)" as AI #FEF3C7
 
-' ─── SESSION LOAD ────────────────────────────────────────────
-U -> UI  : Open /chat
-UI -> DB : Load chat sessions
-DB --> UI : ChatSession[] shown in SubSidebar
+' ─── OPEN CHAT ───────────────────────────────────────────────
+U -> UI  : Opens the AI Chat page
+UI -> SYS : Loads previous conversations
+SYS --> UI : Past conversations shown in the sidebar
 
-alt New chat
-  U -> UI : Click "New Chat"
-else Resume session
-  U -> UI : Click existing session
-  UI -> DB : Load messages for session
-  DB --> UI : ChatMessage[] restored
+alt Starting a new conversation
+  U -> UI : Clicks "New Chat"
+else Continuing an old one
+  U -> UI : Clicks a conversation in the sidebar
+  UI -> SYS : Loads the messages for that conversation
+  SYS --> UI : Previous messages appear on screen
 end
 
-' ─── SEND MESSAGE ────────────────────────────────────────────
-U -> UI  : Type message + press Enter
-UI -> API : POST /api/ai/chat {message, messages[], sessionId?}
+' ─── SEND A MESSAGE ──────────────────────────────────────────
+U -> UI  : Types a question and presses Enter
+UI -> SYS : Sends the message along with conversation history
 
-API -> API : classifyIntent(message)
+SYS -> SYS : Reads the message and figures out what the user needs
+note right
+  Examples of what it detects:
+  · "Which permit do I need?" → recommend a permit
+  · "What documents do I need?" → list required documents
+  · "How does the process work?" → explain the steps
+  · "Show my applications" → fetch user's own records
+  · General question → just answer it
+end note
 
-alt permit_recommendation
-  API -> DB : Fetch all PermitTypes + scenarios
-  DB --> API : permit list
+' ─── LOOK UP THE RIGHT INFORMATION ──────────────────────────
+alt User needs a permit recommendation
+  SYS -> SYS : Looks up all available permit types
+  SYS -> SYS : Matches keywords from the message to real scenarios
 
-else document_requirements
-  API -> API : Detect permit name from conversation
-  API -> DB  : Fetch PermitRequirements for that permit
-  DB --> API : requirements
+else User is asking about required documents
+  SYS -> SYS : Detects which permit type was mentioned in the conversation
+  SYS -> SYS : Looks up the document requirements for that permit
 
-else process_inquiry
-  API -> API : Detect permit name from conversation
-  alt Permit found
-    API -> DB : Fetch steps for that permit
-  else No permit identified
-    API -> DB : Fetch all permit names
-    API -> API : serverSuggestions = [permit names, "Other"]
-    note right: UI will show chips — AI writes one sentence only
+else User is asking how the process works
+  SYS -> SYS : Detects which permit type was mentioned
+  alt Permit type identified
+    SYS -> SYS : Looks up the steps and required documents for that permit
+  else No permit type mentioned yet
+    SYS -> SYS : Loads all permit names to show as quick-reply buttons
+    note right: Asks one short question — "Which permit are you applying for?"
   end
 
-else my_applications
-  API -> DB : Fetch user's applications
-  DB --> API : application list
+else User wants to see their own applications
+  SYS -> SYS : Looks up the user's submitted applications and their statuses
 
-else greeting / conversation
-  note right: No DB fetch
+else General question or greeting
+  note right: No data lookup needed — AI answers directly
 end
 
-API -> AI  : Chat completion {system prompt + data + messages}
-AI --> API : Response text
+' ─── ASK THE AI ──────────────────────────────────────────────
+SYS -> AI  : Sends the question together with the looked-up data\nand instructions on how to respond
+AI --> SYS : Writes a clear, formatted answer
 
-API -> API : Parse [SUGGEST: a | b] from response
-API -> DB  : Save ChatSession + ChatMessages
+' ─── SAVE AND SEND BACK ──────────────────────────────────────
+SYS -> SYS : Saves the conversation so it can be resumed later
+SYS -> SYS : Checks if the AI included quick-reply suggestions in the answer
+SYS --> UI : Sends back the response, any quick-reply buttons,\nany charts, and any action buttons
 
-API --> UI : {response, suggestions[], visualization?, action?}
+' ─── SHOW THE ANSWER ─────────────────────────────────────────
+UI --> U : Displays the formatted answer (bold, lists, etc.)
 
-' ─── RENDER ─────────────────────────────────────────────────
-UI --> U : Render markdown response
-
-alt suggestions present
-  UI --> U : Show suggestion chips (permit names / "Other")
-  U -> UI  : Click chip → send as next message
+alt Quick-reply buttons are available
+  UI --> U : Shows clickable buttons (e.g. permit names, "Other")
+  U -> UI  : Clicks a button — sends it as the next message automatically
 end
 
-alt visualization present
-  UI --> U : Render chart (bar / pie / table)
+alt A chart or table was generated
+  UI --> U : Shows a bar chart, pie chart, or data table
 end
 
-alt action present
-  UI --> U : Render action card (e.g. "Start Application")
+alt An action button was included
+  UI --> U : Shows a card like "Start a New Application"
 end
 
 @enduml
