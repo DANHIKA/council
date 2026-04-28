@@ -1,6 +1,7 @@
 import { NextRequest, NextResponse } from "next/server";
 import { z } from "zod";
 import { prisma } from "@/lib/prisma";
+import { supabaseAdmin } from "@/lib/supabase/admin";
 
 const registerSchema = z.object({
     name: z.string().min(2, "Name must be at least 2 characters"),
@@ -22,21 +23,28 @@ export async function POST(req: NextRequest) {
                 return NextResponse.json({ error: "Email already registered" }, { status: 409 });
             }
             // Pre-seeded demo account — claim it by linking the Supabase ID
-            await prisma.user.update({
+            const updated = await prisma.user.update({
                 where: { email },
                 data: { supabaseId, name },
+            });
+            await supabaseAdmin.auth.admin.updateUserById(supabaseId, {
+                app_metadata: { prismaId: updated.id, role: updated.role },
             });
             return NextResponse.json({ message: "Account linked successfully" }, { status: 200 });
         }
 
         // Brand-new user — always starts as APPLICANT
-        await prisma.user.create({
+        const newUser = await prisma.user.create({
             data: {
                 name,
                 email,
                 role: "APPLICANT",
                 supabaseId,
             },
+        });
+
+        await supabaseAdmin.auth.admin.updateUserById(supabaseId, {
+            app_metadata: { prismaId: newUser.id, role: newUser.role },
         });
 
         return NextResponse.json({ message: "Account created successfully" }, { status: 201 });

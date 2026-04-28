@@ -51,7 +51,11 @@ export default function RegisterPage() {
             const data = await res.json();
             if (!res.ok) {
                 setError(data.error || "Registration failed.");
+            } else if (signUpData.session) {
+                // Email confirmation disabled — user is already signed in, go straight to dashboard
+                router.push("/dashboard");
             } else {
+                // Email confirmation enabled — ask user to check their inbox
                 router.push("/auth/login?registered=1");
             }
         } catch {
