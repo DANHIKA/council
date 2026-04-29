@@ -73,6 +73,7 @@
   },
   "devDependencies": {
     "@tailwindcss/postcss": "^4",
+    "@types/maplibre-gl": "^1.13.2",
     "@types/node": "^20",
     "@types/pg": "^8.18.0",
     "@types/react": "^19",

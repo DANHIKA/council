@@ -31,34 +31,36 @@ export default function RegisterPage() {
 
         setLoading(true);
         try {
-            const supabase = createSupabaseBrowserClient();
-            const { data: signUpData, error: signUpError } = await supabase.auth.signUp({
-                email,
-                password,
-                options: { data: { name } },
-            });
-
-            if (signUpError || !signUpData.user) {
-                setError(signUpError?.message || "Registration failed.");
-                return;
-            }
-
+            console.log("[register] step 1: calling /api/auth/register for", email);
             const res = await fetch("/api/auth/register", {
                 method: "POST",
                 headers: { "Content-Type": "application/json" },
-                body: JSON.stringify({ name, email, supabaseId: signUpData.user.id }),
+                body: JSON.stringify({ name, email, password }),
             });
             const data = await res.json();
+            console.log("[register] step 1 result:", { status: res.status, ok: res.ok, data });
+
             if (!res.ok) {
+                console.error("[register] API error:", data.error);
                 setError(data.error || "Registration failed.");
-            } else if (signUpData.session) {
-                // Email confirmation disabled — user is already signed in, go straight to dashboard
-                router.push("/dashboard");
-            } else {
-                // Email confirmation enabled — ask user to check their inbox
-                router.push("/auth/login?registered=1");
+                return;
             }
-        } catch {
+
+            console.log("[register] step 2: signing in with supabase.auth.signInWithPassword");
+            const supabase = createSupabaseBrowserClient();
+            const { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({ email, password });
+            console.log("[register] step 2 result:", { session: !!signInData?.session, error: signInError?.message });
+
+            if (signInError || !signInData.session) {
+                console.error("[register] sign-in after registration failed:", signInError);
+                // Account was created — redirect to login so user can sign in manually
+                router.push("/auth/login?registered=1");
+            } else {
+                console.log("[register] signed in → pushing /dashboard");
+                router.push("/dashboard");
+            }
+        } catch (err) {
+            console.error("[register] unexpected error:", err);
             setError("Something went wrong. Please try again.");
         } finally {
             setLoading(false);
